@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== CHURCH ====================
+model Church {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  city        String
+  province    String
+  country     String
+  currency    String   @default("USD")
+  initialCapital Float  @default(0)
+  email       String   @unique
+  phone       String?
+  logo        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users         User[]
+  members       Member[]
+  transactions  Transaction[]
+  events        Event[]
+  attendance    Attendance[]
+  messages      Message[]
+  memberCards   MemberCard[]
+  notifications Notification[]
+  subscriptions Subscription[]
+  auditLogs     AuditLog[]
+  settings      ChurchSetting[]
+  archives      Archive[]
+  debts         Debt[]
+}
+
+// ==================== USER ====================
+model User {
+  id           String   @id @default(cuid())
+  churchId     String
+  email        String
+  passwordHash String
+  firebaseUid  String?
+  firstName    String
+  lastName     String
+  username     String?
+  function     String?
+  phone        String?
+  role         String   @default("reader") // admin, treasurer, secretary, reader
+  isActive     Boolean  @default(true)
+  verified     Boolean  @default(false)
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  church     Church           @relation(fields: [churchId], references: [id])
+  sentMessages Message[]      @relation("SentMessages")
+  receivedMessages Message[]  @relation("ReceivedMessages")
+  otps       Otp[]
+  auditLogs  AuditLog[]
+
+  @@unique([churchId, email])
+}
+
+// ==================== MEMBER ====================
+model Member {
+  id          String   @id @default(cuid())
+  churchId    String
+  firstName   String
+  lastName    String
+  phone       String?
+  email       String?
+  address     String?
+  department  String?
+  function    String?
+  photo       String?
+  status      String   @default("active") // active, inactive
+  joinDate    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church      Church       @relation(fields: [churchId], references: [id])
+  attendance  Attendance[]
+  memberCards MemberCard[]
+  transactions Transaction[] @relation("MemberTransactions")
+}
+
+// ==================== TRANSACTION ====================
+model Transaction {
+  id          String   @id @default(cuid())
+  churchId    String
+  type        String   // revenue, expense
+  category    String   // offering, tithe, donation, contribution, salary, water, electricity, internet, etc.
+  amount      Float
+  currency    String   @default("USD")
+  location    String   @default("cash") // bank, cash
+  description String?
+  date        DateTime @default(now())
+  memberId    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church   Church  @relation(fields: [churchId], references: [id])
+  member   Member? @relation("MemberTransactions", fields: [memberId], references: [id])
+}
+
+// ==================== EVENT ====================
+model Event {
+  id          String   @id @default(cuid())
+  churchId    String
+  title       String
+  description String?
+  type        String   // culte, reunion, seminar, conference, formation
+  startDate   DateTime
+  endDate     DateTime?
+  location    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church     Church       @relation(fields: [churchId], references: [id])
+  attendance Attendance[]
+}
+
+// ==================== ATTENDANCE ====================
+model Attendance {
+  id          String   @id @default(cuid())
+  churchId    String
+  eventId     String?
+  memberId    String
+  status      String   @default("present") // present, absent, late
+  date        DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id])
+  event  Event?  @relation(fields: [eventId], references: [id])
+  member Member  @relation(fields: [memberId], references: [id])
+}
+
+// ==================== MESSAGE ====================
+model Message {
+  id          String   @id @default(cuid())
+  churchId    String
+  senderId    String
+  receiverId  String
+  subject     String
+  content     String
+  isRead      Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  church   Church @relation(fields: [churchId], references: [id])
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+// ==================== NOTIFICATION ====================
+model Notification {
+  id        String   @id @default(cuid())
+  churchId  String
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id])
+}
+
+// ==================== MEMBER CARD ====================
+model MemberCard {
+  id          String   @id @default(cuid())
+  churchId    String
+  memberId    String
+  cardNumber  String   @unique
+  qrCode      String
+  isPaid      Boolean  @default(false)
+  paidAmount  Float    @default(0)
+  paymentRef  String?
+  createdAt   DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id])
+  member Member @relation(fields: [memberId], references: [id])
+}
+
+// ==================== SUBSCRIPTION ====================
+model Subscription {
+  id            String   @id @default(cuid())
+  churchId      String
+  plan          String   @default("trial") // trial, monthly, annual
+  status        String   @default("active") // active, expired, cancelled
+  startDate     DateTime @default(now())
+  endDate       DateTime
+  amount        Float
+  currency      String   @default("USD")
+  paymentRef    String?
+  paymentStatus String   @default("pending") // pending, completed, failed
+  autoRenew     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id])
+}
+
+// ==================== OTP ====================
+model Otp {
+  id        String   @id @default(cuid())
+  churchId  String?
+  userId    String?
+  email     String
+  code      String
+  purpose   String   @default("verification") // verification, password_reset
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+// ==================== CHURCH SETTING ====================
+model ChurchSetting {
+  id        String   @id @default(cuid())
+  churchId  String
+  key       String
+  value     String
+  updatedAt DateTime @updatedAt
+
+  church Church @relation(fields: [churchId], references: [id])
+
+  @@unique([churchId, key])
+}
+
+// ==================== AUDIT LOG ====================
+model AuditLog {
+  id        String   @id @default(cuid())
+  churchId  String
+  userId    String
+  action    String
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  church Church @relation(fields: [churchId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==================== ARCHIVE ====================
+model Archive {
+  id          String   @id @default(cuid())
+  churchId    String
+  type        String   // monthly, annual
+  period      String   // e.g. "2026-05", "2025"
+  size        Int      // size in bytes
+  recordCount Int
+  userId      String?  // user who triggered it (null if auto)
+  data        String   // serialized JSON data
+  createdAt   DateTime @default(now())
+
+  church      Church   @relation(fields: [churchId], references: [id])
+}
+
+// ==================== DEBT ====================
+model Debt {
+  id              String   @id @default(cuid())
+  churchId        String
+  amount          Float
+  currency        String   @default("USD")
+  creditor        String
+  description     String?
+  status          String   @default("pending") // pending, approved, rejected, paid, cancelled
+  createdBy       String
+  approvedBy      String?
+  approvalComment String?
+  date            DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  church          Church   @relation(fields: [churchId], references: [id])
+  payments        DebtPayment[]
+}
+
+// ==================== DEBT PAYMENT ====================
+model DebtPayment {
+  id        String   @id @default(cuid())
+  debtId    String
+  amount    Float
+  date      DateTime @default(now())
+  createdBy String
+  createdAt DateTime @default(now())
+
+  debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+}
