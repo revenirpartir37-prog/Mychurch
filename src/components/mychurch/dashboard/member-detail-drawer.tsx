@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
   Sheet,
   SheetContent,
@@ -17,10 +18,12 @@ import {
 } from '@/components/ui/sheet'
 import {
   Mail, Phone, MapPin, CalendarDays, Building2, Briefcase,
-  UserCheck, Wallet, Clock,
+  UserCheck, Wallet, Clock, FileDown,
 } from 'lucide-react'
 import { EmptyState } from '@/components/mychurch/shared/empty-state'
 import { REVENUE_LABELS, EXPENSE_LABELS } from '@/lib/constants'
+import { generateMemberPdf } from '@/lib/member-pdf'
+import { useAppStore } from '@/store/app-store'
 
 interface Member {
   id: string
@@ -138,6 +141,23 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [transactions, setTransactions] = useState<TransactionRecord[]>([])
   const [loading, setLoading] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+
+  const handleDownloadPdf = async () => {
+    if (!member) return
+    setDownloadingPdf(true)
+    try {
+      await generateMemberPdf(member, {
+        name: useAppStore.getState().auth.churchName || 'MYCHURCH',
+        logo: useAppStore.getState().auth.churchLogo || null,
+      })
+      toast.success('Fiche PDF téléchargée')
+    } catch {
+      toast.error('Erreur lors de la génération du PDF')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
 
   const fetchData = useCallback(async () => {
     if (!member) return
@@ -236,6 +256,16 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
                     )}
                   </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 shrink-0 gap-1.5 text-xs"
+                  onClick={handleDownloadPdf}
+                  disabled={downloadingPdf}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  {downloadingPdf ? 'PDF...' : 'PDF'}
+                </Button>
               </div>
             </div>
 
