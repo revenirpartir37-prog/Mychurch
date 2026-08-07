@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
+import { createSupabaseUser } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'A church with this email already exists' }, { status: 409 })
     }
 
+    // Créer l'utilisateur Supabase Auth (source d'identité) AVANT le user DB.
+    const supabaseUid = await createSupabaseUser(data.email, data.password)
+
+    // Garde un hash bcrypt dans la DB pour respecter le champ non-null requirable
     const passwordHash = await bcrypt.hash(data.password, 10)
 
     // Create church
@@ -56,7 +61,7 @@ export async function POST(request: NextRequest) {
         churchId: church.id,
         email: data.email,
         passwordHash,
-        firebaseUid: data.firebaseUid || null,
+        firebaseUid: data.firebaseUid || supabaseUid,
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone || null,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 import { CREATOR } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -261,6 +262,9 @@ export function MembersPage() {
 
   useEffect(() => { fetchMembers() }, [fetchMembers])
   useEffect(() => { fetchDepartments() }, [fetchDepartments])
+
+  // Realtime : rafraîchit la liste dès qu'un membre change (en + du polling)
+  useSupabaseRealtime(['member'], () => fetchMembers(), auth.churchId)
 
   // Clear selection when page/filters change
   useEffect(() => { setSelectedIds(new Set()) }, [fetchMembers])

@@ -15,8 +15,9 @@ Plateforme moderne de gestion d'église — Progressive Web App (PWA).
 ## Stack technique
 
 - **Frontend** : Next.js 16, Tailwind CSS, shadcn/ui, TypeScript
-- **Backend** : Prisma ORM, SQLite (dev), Firebase Auth
-- **Stockage** : Supabase Storage (photos/logos)
+- **Backend** : Prisma ORM, Supabase PostgreSQL, Supabase Auth + Firebase (Google OAuth)
+- **Stockage** : Supabase Storage (photos/logos, bucket `Mychurch-bucket`)
+- **Realtime** : Supabase Realtime (rafraîchissement temps réel en plus du polling)
 - **Notifications** : OneSignal
 - **Email** : Resend (OTP)
 
@@ -38,10 +39,23 @@ cp .env.example .env
 
 ## Base de données
 
+La base de production est hébergée sur **Supabase** (PostgreSQL).
+
 ```bash
 npx prisma generate
 npx prisma db push
 ```
+
+- `DATABASE_URL` pointe vers le **session pooler** Supabase (port `5432`) — compatible Prisma.
+- Les migrations Prisma sont dans `prisma/migrations/` (baseline `20260807000000_init`).
+- Script de migration depuis SQLite : `npm run db:migrate:sqlite` (voir `scripts/migrate-sqlite-to-supabase.cjs`).
+- Politiques Storage : `db/supabase-storage.sql`.
+- Realtime activé sur la publication `supabase_realtime` : `db/supabase-realtime.sql`.
+
+## Authentification & sessions
+
+- **Supabase Auth** est la source des identités (email/mot de passe). Les routes `/api/auth/*` vérifient le mot de passe via Supabase Auth puis émettent le JWT applicatif (`src/lib/auth.ts`).
+- Modèles activés dans `useSupabaseRealtime` (`src/hooks/use-supabase-realtime.ts`).
 
 ## Démarrage
 

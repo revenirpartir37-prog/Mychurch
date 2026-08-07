@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit'
-import bcrypt from 'bcryptjs'
+import { verifySupabasePassword } from '@/lib/supabase'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -45,9 +45,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'User account is deactivated' }, { status: 403 })
     }
 
-    // Verify password
-    const isValid = await bcrypt.compare(data.password, user.passwordHash)
-    if (!isValid) {
+    // Verify password via Supabase Auth
+    try {
+      const supabaseUid = await verifySupabasePassword(user.email, data.password)
+      await db.user.update({ where: { id: user.id }, data: { firebaseUid: supabaseUid } })
+    } catch (e) {
+      if (e instanceof Error && e.message === 'InvalidCredentials') {
+        return Response.json({ error: 'Invalid credentials' }, { status: 401 })
+      }
+      console.error('Supabase auth error:', e)
       return Response.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 import { CREATOR, REVENUE_LABELS, EXPENSE_LABELS, CURRENCY_LABELS, type RevenueCategory, type ExpenseCategory, type Currency, type TransactionLocation } from '@/lib/constants'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -105,6 +106,9 @@ export function FinancesPage() {
   }, [auth.token, page, typeFilter, currencyFilter, locationFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Realtime : rafraîchit les finances dès qu'une transaction change (en + du polling)
+  useSupabaseRealtime(['transaction'], () => fetchData(), auth.churchId)
 
   // Fetch all transactions for chart data
   const fetchChartData = useCallback(async () => {

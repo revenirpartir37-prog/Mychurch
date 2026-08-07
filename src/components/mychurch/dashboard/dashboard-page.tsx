@@ -33,6 +33,7 @@ import { EVENT_LABELS, type EventType } from '@/lib/constants'
 import { format, parseISO } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { canCreateMembers, canCreateFinances, canCreateEvents, canSendMessages, canViewFinances } from '@/lib/frontend-rbac'
+import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 
 interface DashboardStats {
   totalMembers: number
@@ -142,7 +143,10 @@ export function DashboardPage() {
     loadDashboardData()
   }, [])
 
-  const loadDashboardData = async () => {
+  // Realtime Supabase : rafraîchit le dashboard dès qu'une donnée change (en complément du polling)
+  useSupabaseRealtime(['transaction', 'member', 'event', 'attendance', 'debt', 'notification'], () => loadDashboardData(), auth.churchId)
+
+  async function loadDashboardData() {
     try {
       const token = auth.token
       const headers = { 'Authorization': `Bearer ${token}` }

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
+import { updateSupabasePassword } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 
 const resetPasswordSchema = z.object({
@@ -38,7 +39,10 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
     }
 
-    // Hash the new password and update
+    // Mettre à jour le mot de passe côté Supabase Auth (source d'identité)
+    await updateSupabasePassword(user.email, data.newPassword)
+
+    // Sync du hash local (champ requis par le schéma, non utilisé pour le login)
     const passwordHash = await bcrypt.hash(data.newPassword, 10)
     await db.user.update({
       where: { id: user.id },

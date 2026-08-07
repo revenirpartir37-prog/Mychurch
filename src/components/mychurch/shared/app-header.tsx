@@ -17,6 +17,7 @@ import { useAppStore } from '@/store/app-store'
 import { ROLE_LABELS } from '@/lib/constants'
 import type { UserRole } from '@/lib/constants'
 import Image from 'next/image'
+import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 
 interface AppHeaderProps {
   onToggleSidebar?: () => void
@@ -42,21 +43,6 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
   useEffect(() => {
     if (!auth.token) return
 
-    const fetchUnreadCount = async () => {
-      try {
-        const res = await fetch('/api/notifications?isRead=false&limit=1', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          const count = data.unreadCount ?? (data.notifications ?? data.data ?? []).length
-          setUnreadCount(count)
-        }
-      } catch {
-        // silent
-      }
-    }
-
     fetchUnreadCount()
 
     intervalRef.current = setInterval(fetchUnreadCount, 30000)
@@ -65,6 +51,24 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [auth.token, setUnreadCount])
+
+  async function fetchUnreadCount() {
+    try {
+      const res = await fetch('/api/notifications?isRead=false&limit=1', {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const count = data.unreadCount ?? (data.notifications ?? data.data ?? []).length
+        setUnreadCount(count)
+      }
+    } catch {
+      // silent
+    }
+  }
+
+  // Realtime : rafraîchit le compteur de notifications dès qu'une notification arrive (en + du polling 30s)
+  useSupabaseRealtime(['notification'], () => fetchUnreadCount(), auth.churchId)
 
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/50 bg-background/80 px-4 backdrop-blur-md sm:px-6">
