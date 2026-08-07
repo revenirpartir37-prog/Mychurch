@@ -57,6 +57,10 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
       const res = await fetch('/api/notifications?isRead=false&limit=1', {
         headers: { Authorization: `Bearer ${auth.token}` },
       })
+      if (res.status === 401) {
+        logout()
+        return
+      }
       if (res.ok) {
         const data = await res.json()
         const count = data.unreadCount ?? (data.notifications ?? data.data ?? []).length

@@ -28,8 +28,12 @@ export async function generateRefreshToken(userId: string): Promise<string> {
 }
 
 export async function verifyAccessToken(token: string): Promise<JWTPayload | null> {
+  if (!token || typeof token !== 'string' || token === 'null' || token === 'undefined' || token.trim() === '') {
+    return null
+  }
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token.trim(), JWT_SECRET)
+    if (!payload || !payload.userId || !payload.churchId) return null
     return payload as unknown as JWTPayload
   } catch {
     return null

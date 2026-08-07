@@ -151,28 +151,31 @@ export function DashboardPage() {
       const token = auth.token
       const headers = { 'Authorization': `Bearer ${token}` }
 
-      const [
-        financeRes,
-        attendanceRes,
-        membersListRes,
-        auditRes,
-        eventsListRes,
-        debtsRes,
-      ] = await Promise.allSettled([
-        fetch('/api/finances?limit=5', { headers }).then(r => r.json()),
-        fetch('/api/attendance?limit=1', { headers }).then(r => r.json()),
-        fetch('/api/members?limit=5&sort=desc', { headers }).then(r => r.json()),
-        fetch('/api/audit-logs?limit=8', { headers }).then(r => r.json()),
-        fetch('/api/events?limit=5', { headers }).then(r => r.json()),
-        auth.role === 'admin'
-          ? fetch('/api/debts?status=pending&limit=5', { headers }).then(r => r.json())
-          : Promise.resolve(null),
-      ])
+      const fetchJson = async (url: string) => {
+        try {
+          const r = await fetch(url, { headers })
+          if (!r.ok) return null
+          return await r.json()
+        } catch {
+          return null
+        }
+      }
 
-      const financeData = financeRes.status === 'fulfilled' ? financeRes.value : null
-      const attendanceData = attendanceRes.status === 'fulfilled' ? attendanceRes.value : null
-      const membersListData = membersListRes.status === 'fulfilled' ? membersListRes.value : null
-      const eventsListData = eventsListRes.status === 'fulfilled' ? eventsListRes.value : null
+      const [
+        financeData,
+        attendanceData,
+        membersListData,
+        auditData,
+        eventsListData,
+        debtsData,
+      ] = await Promise.all([
+        fetchJson('/api/finances?limit=5'),
+        fetchJson('/api/attendance?limit=1'),
+        fetchJson('/api/members?limit=5&sort=desc'),
+        fetchJson('/api/audit-logs?limit=8'),
+        fetchJson('/api/events?limit=5'),
+        auth.role === 'admin' ? fetchJson('/api/debts?status=pending&limit=5') : Promise.resolve(null),
+      ])
 
       const memberTotal = membersListData?.pagination?.total ?? membersListData?.total ?? 0
       const eventTotal = eventsListData?.pagination?.total ?? eventsListData?.total ?? 0
@@ -187,20 +190,20 @@ export function DashboardPage() {
         monthlyAttendance: attendanceTotal,
       })
 
-      if (financeRes.status === 'fulfilled' && financeRes.value) {
-        setRecentTransactions(financeRes.value.transactions ?? financeRes.value.data ?? [])
+      if (financeData) {
+        setRecentTransactions(financeData.transactions ?? financeData.data ?? [])
       }
 
-      if (membersListRes.status === 'fulfilled' && membersListRes.value) {
-        setRecentMembers(membersListRes.value.members ?? membersListRes.value.data ?? [])
+      if (membersListData) {
+        setRecentMembers(membersListData.members ?? membersListData.data ?? [])
       }
 
-      if (auditRes.status === 'fulfilled' && auditRes.value) {
-        setAuditLogs(auditRes.value.logs ?? [])
+      if (auditData) {
+        setAuditLogs(auditData.logs ?? [])
       }
 
-      if (eventsListRes.status === 'fulfilled' && eventsListRes.value) {
-        const allEvents: UpcomingEvent[] = (eventsListRes.value.events ?? []).map((e: any) => ({
+      if (eventsListData) {
+        const allEvents: UpcomingEvent[] = (eventsListData.events ?? []).map((e: any) => ({
           id: e.id,
           title: e.title,
           type: e.type,
@@ -212,8 +215,8 @@ export function DashboardPage() {
         setUpcomingEvents(futureEvents)
       }
 
-      if (debtsRes.status === 'fulfilled' && debtsRes.value) {
-        setPendingDebts(debtsRes.value.debts ?? [])
+      if (debtsData) {
+        setPendingDebts(debtsData.debts ?? [])
       }
     } catch (err) {
       console.error('Dashboard load error:', err)
