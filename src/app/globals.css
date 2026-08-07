@@ -456,14 +456,21 @@ html, body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Print styles for member cards */
+/* Print styles for member cards (Recto / Verso 2 distinct pages) */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
   html, body {
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   body > *:not(#member-card-print-area) {
@@ -477,21 +484,43 @@ html, body {
     left: 0 !important;
     top: 0 !important;
     width: 100% !important;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-page-1 {
+    page-break-after: always !important;
+    break-after: page !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #ffffff !important;
+    padding: 20mm !important;
+  }
+
+  .print-page-2 {
+    page-break-before: always !important;
+    break-before: page !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #ffffff !important;
+    padding: 20mm !important;
   }
 
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 10mm;
   }
 }
 
 #member-card-print-area {
   display: none;
 }
+
 

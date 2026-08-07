@@ -54,6 +54,10 @@ export function FinancesPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [totals, setTotals] = useState({ revenue: 0, expense: 0, balance: 0 })
+  const [currencies, setCurrencies] = useState<Record<string, { initialCapital: number; revenue: number; expense: number; balance: number }>>(
+    { USD: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }, EUR: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }, CDF: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 } }
+  )
+  const [nextRefNumber, setNextRefNumber] = useState('REF-000001')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [members, setMembers] = useState<{ id: string; firstName: string; lastName: string }[]>([])
@@ -99,6 +103,10 @@ export function FinancesPage() {
           expense: data.totals?.expense || 0,
           balance: data.totals?.balance || 0,
         })
+        // Multi-currency balances
+        if (data.currencies) setCurrencies(data.currencies)
+        // Next reference number
+        if (data.nextReferenceNumberFormatted) setNextRefNumber(data.nextReferenceNumberFormatted)
       }
       // Fetch members for dropdown
       const mRes = await fetch('/api/members?limit=100', {
@@ -206,7 +214,7 @@ export function FinancesPage() {
       location: 'cash', description: '', date: new Date().toISOString().split('T')[0], memberId: '',
       recordedByName: userFullName,
       beneficiary: '',
-      referenceNumber: `REF-${Date.now().toString().slice(-6)}`,
+      referenceNumber: nextRefNumber,
       signatureData: null,
     })
     setDialogOpen(true)
@@ -403,6 +411,64 @@ export function FinancesPage() {
             <ArrowDownRight className="h-4 w-4" /> Dépense
           </Button>
         </div>
+      </div>
+
+      {/* Multi-Currency Caisse Physique Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { currency: 'USD', symbol: '$', color: 'emerald', icon: '🇺🇸' },
+          { currency: 'EUR', symbol: '€', color: 'blue', icon: '🇪🇺' },
+          { currency: 'CDF', symbol: 'FC', color: 'amber', icon: '🇨🇩' },
+        ].map(({ currency, symbol, color, icon }) => {
+          const c = currencies[currency] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
+          const isNegative = c.balance < 0
+          return (
+            <Card key={currency} className={`border-l-4 hover:shadow-lg transition-all duration-200 overflow-hidden relative ${
+              color === 'emerald' ? 'border-l-emerald-500' : color === 'blue' ? 'border-l-blue-500' : 'border-l-amber-500'
+            }`}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-2 rounded-lg ${
+                      color === 'emerald' ? 'bg-emerald-500/10' : color === 'blue' ? 'bg-blue-500/10' : 'bg-amber-500/10'
+                    }`}>
+                      <Banknote className={`h-5 w-5 ${
+                        color === 'emerald' ? 'text-emerald-500' : color === 'blue' ? 'text-blue-500' : 'text-amber-500'
+                      }`} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Caisse {currency}</p>
+                      <p className={`text-xl font-bold tabular-nums ${
+                        isNegative ? 'text-rose-500' : color === 'emerald' ? 'text-emerald-600' : color === 'blue' ? 'text-blue-600' : 'text-amber-600'
+                      }`}>
+                        {c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {symbol}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-lg">{icon}</span>
+                </div>
+                <div className="space-y-1.5 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Capital initial</span>
+                    <span className="font-medium text-foreground tabular-nums">{c.initialCapital.toLocaleString('fr-FR')} {symbol}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-emerald-600">+ Recettes</span>
+                    <span className="font-medium text-emerald-600 tabular-nums">+{c.revenue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-rose-500">− Dépenses</span>
+                    <span className="font-medium text-rose-500 tabular-nums">−{c.expense.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+                  </div>
+                  <div className={`flex justify-between pt-1.5 mt-1 border-t font-semibold ${isNegative ? 'text-rose-500' : 'text-foreground'}`}>
+                    <span>Solde disponible</span>
+                    <span className="tabular-nums">{c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Analyse financière — Charts Section (top) */}
@@ -941,11 +1007,12 @@ export function FinancesPage() {
               <div className="space-y-2">
                 <Label className="text-xs">N° Référence (Automatique)</Label>
                 <Input
-                  value={form.referenceNumber || 'Génération automatique (REF-000001)'}
+                  value={form.referenceNumber || nextRefNumber}
                   readOnly
                   disabled
                   className="bg-muted font-mono text-xs cursor-not-allowed opacity-80"
                 />
+                <p className="text-[10px] text-muted-foreground">Attribué automatiquement — non modifiable</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs">
@@ -982,6 +1049,27 @@ export function FinancesPage() {
                 </Select>
               </div>
             </div>
+            {/* Available balance warning for expenses */}
+            {(() => {
+              const currInfo = currencies[form.currency] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
+              const symbolMap: Record<string, string> = { USD: '$', EUR: '€', CDF: 'FC' }
+              const sym = symbolMap[form.currency] || form.currency
+              const enteredAmount = parseFloat(form.amount) || 0
+              const isOver = form.type === 'expense' && enteredAmount > 0 && enteredAmount > currInfo.balance
+              if (form.type === 'expense') return (
+                <div className={`rounded-lg px-3 py-2 text-xs flex items-start gap-2 ${isOver ? 'bg-rose-50 border border-rose-200 text-rose-700' : 'bg-muted/50 text-muted-foreground'}`}>
+                  <span className="mt-0.5">{isOver ? '⚠️' : '💰'}</span>
+                  <div>
+                    <span className="font-semibold">Solde disponible en {form.currency} : </span>
+                    <span className="font-mono">{currInfo.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {sym}</span>
+                    {isOver && (
+                      <p className="mt-0.5 font-semibold">Le montant saisi dépasse le solde disponible. La dépense sera refusée.</p>
+                    )}
+                  </div>
+                </div>
+              )
+              return null
+            })()}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

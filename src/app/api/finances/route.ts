@@ -42,7 +42,7 @@ const updateTransactionSchema = z.object({
   signatureData: z.string().optional().nullable(),
 })
 
-// GET: List transactions with filters and totals
+// GET: List transactions with filters and multi-currency balances
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAuth(request)
@@ -76,7 +76,16 @@ export async function GET(request: NextRequest) {
       where.date = dateFilter
     }
 
-    const [transactions, total, totalsResult] = await Promise.all([
+    // Fetch church for base initial capital & currency
+    const church = await db.church.findUnique({
+      where: { id: auth.churchId },
+      select: { currency: true, initialCapital: true },
+    })
+
+    const baseCurrency = (church?.currency || 'USD').toUpperCase()
+    const baseInitialCapital = church?.initialCapital || 0
+
+    const [transactions, total, multiCurrencyTotals, totalCount] = await Promise.all([
       db.transaction.findMany({
         where,
         orderBy: { date: 'desc' },
@@ -85,32 +94,36 @@ export async function GET(request: NextRequest) {
         include: { member: { select: { id: true, firstName: true, lastName: true } } },
       }),
       db.transaction.count({ where }),
-      // Get aggregated totals for revenue and expense
       db.transaction.groupBy({
-        by: ['type'],
-        where: {
-          churchId: auth.churchId,
-          ...(startDate || endDate
-            ? {
-                date: {
-                  ...(startDate ? { gte: new Date(startDate) } : {}),
-                  ...(endDate ? { lte: new Date(endDate) } : {}),
-                },
-              }
-            : {}),
-        },
+        by: ['currency', 'type'],
+        where: { churchId: auth.churchId },
         _sum: { amount: true },
       }),
+      db.transaction.count({ where: { churchId: auth.churchId } }),
     ])
 
-    // Compute totals
-    let totalRevenue = 0
-    let totalExpense = 0
-    for (const r of totalsResult) {
-      if (r.type === 'revenue') totalRevenue = r._sum.amount || 0
-      if (r.type === 'expense') totalExpense = r._sum.amount || 0
+    // Build multi-currency balances structure
+    const currencies = {
+      USD: { initialCapital: baseCurrency === 'USD' ? baseInitialCapital : 0, revenue: 0, expense: 0, balance: 0 },
+      EUR: { initialCapital: baseCurrency === 'EUR' ? baseInitialCapital : 0, revenue: 0, expense: 0, balance: 0 },
+      CDF: { initialCapital: baseCurrency === 'CDF' ? baseInitialCapital : 0, revenue: 0, expense: 0, balance: 0 },
     }
-    const balance = totalRevenue - totalExpense
+
+    for (const item of multiCurrencyTotals) {
+      const curr = (item.currency || 'USD').toUpperCase() as 'USD' | 'EUR' | 'CDF'
+      if (currencies[curr]) {
+        if (item.type === 'revenue') currencies[curr].revenue += item._sum.amount || 0
+        if (item.type === 'expense') currencies[curr].expense += item._sum.amount || 0
+      }
+    }
+
+    for (const curr of ['USD', 'EUR', 'CDF'] as const) {
+      currencies[curr].balance = currencies[curr].initialCapital + currencies[curr].revenue - currencies[curr].expense
+    }
+
+    // Next reference number formatted as 6 digits, e.g., 000001
+    const nextRefNumber = String(totalCount + 1).padStart(6, '0')
+    const nextRefNumberFormatted = `REF-${nextRefNumber}`
 
     return Response.json({
       transactions,
@@ -120,10 +133,13 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / limit),
       },
+      currencies,
+      nextReferenceNumber: nextRefNumber,
+      nextReferenceNumberFormatted: nextRefNumberFormatted,
       totals: {
-        revenue: totalRevenue,
-        expense: totalExpense,
-        balance,
+        revenue: currencies[baseCurrency as keyof typeof currencies]?.revenue || 0,
+        expense: currencies[baseCurrency as keyof typeof currencies]?.expense || 0,
+        balance: currencies[baseCurrency as keyof typeof currencies]?.balance || 0,
       },
     })
   } catch (error) {
@@ -132,7 +148,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Create transaction
+// POST: Create transaction with currency balance check & 6-digit reference validation
 export async function POST(request: NextRequest) {
   try {
     const auth = await getAuth(request)
@@ -142,12 +158,62 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = createTransactionSchema.parse(body)
+    const targetCurrency = (data.currency || 'USD').toUpperCase()
 
-    // Generate sequential reference number if missing (REF-000001 format)
-    let refNum = data.referenceNumber
-    if (!refNum || refNum.startsWith('AUTO') || refNum.startsWith('REF-')) {
-      const count = await db.transaction.count({ where: { churchId: auth.churchId } })
-      refNum = `REF-${String(count + 1).padStart(6, '0')}`
+    // 1. Fetch current balance for the selected currency
+    const church = await db.church.findUnique({
+      where: { id: auth.churchId },
+      select: { currency: true, initialCapital: true },
+    })
+
+    const baseCurrency = (church?.currency || 'USD').toUpperCase()
+    const initialCapital = baseCurrency === targetCurrency ? (church?.initialCapital || 0) : 0
+
+    const currencyTotals = await db.transaction.groupBy({
+      by: ['type'],
+      where: { churchId: auth.churchId, currency: targetCurrency },
+      _sum: { amount: true },
+    })
+
+    let currentRevenue = 0
+    let currentExpense = 0
+    for (const item of currencyTotals) {
+      if (item.type === 'revenue') currentRevenue = item._sum.amount || 0
+      if (item.type === 'expense') currentExpense = item._sum.amount || 0
+    }
+
+    const availableBalance = initialCapital + currentRevenue - currentExpense
+
+    // If expense, check that cash balance is sufficient
+    if (data.type === 'expense' && data.amount > availableBalance) {
+      return Response.json(
+        {
+          error: `Solde de caisse insuffisant en ${targetCurrency}. Solde disponible: ${availableBalance.toLocaleString()} ${targetCurrency}, montant requis: ${data.amount.toLocaleString()} ${targetCurrency}.`,
+        },
+        { status: 400 }
+      )
+    }
+
+    // 2. Validate & format 6-digit reference number (e.g. 000001 or REF-000001)
+    const totalCount = await db.transaction.count({ where: { churchId: auth.churchId } })
+    const autoRefNumber = String(totalCount + 1).padStart(6, '0')
+    let refNum = data.referenceNumber?.trim()
+
+    if (!refNum || refNum === '' || refNum === '000000' || refNum.startsWith('AUTO') || refNum === `REF-${autoRefNumber}` || refNum === autoRefNumber) {
+      refNum = `REF-${autoRefNumber}`
+    } else {
+      // Validate custom entered reference: must exist in church transactions or match 6-digit pattern
+      const cleanRef = refNum.replace(/^REF-/, '')
+      const existingRef = await db.transaction.findFirst({
+        where: { churchId: auth.churchId, OR: [{ referenceNumber: refNum }, { referenceNumber: `REF-${cleanRef}` }, { referenceNumber: cleanRef }] },
+      })
+      if (!existingRef && !/^\d{6}$/.test(cleanRef)) {
+        return Response.json(
+          { error: 'Numéro de référence invalide. Doit être au format 6 chiffres (ex: 000001) ou correspondre à une transaction existante.' },
+          { status: 400 }
+        )
+      }
+      refNum = refNum.startsWith('REF-') ? refNum : `REF-${cleanRef.padStart(6, '0')}`
     }
 
     const transaction = await db.transaction.create({
@@ -156,7 +222,7 @@ export async function POST(request: NextRequest) {
         type: data.type,
         category: data.category,
         amount: data.amount,
-        currency: data.currency,
+        currency: targetCurrency,
         location: data.location,
         description: data.description || null,
         date: data.date ? new Date(data.date) : new Date(),
@@ -175,7 +241,7 @@ export async function POST(request: NextRequest) {
       churchId: auth.churchId,
       userId: auth.userId,
       action: 'create_transaction',
-      details: `Transaction ${data.type} créée: ${data.category} - ${data.amount} ${data.currency}`,
+      details: `Transaction ${data.type} créée: ${data.category} - ${data.amount} ${targetCurrency} (Réf: ${refNum})`,
     })
 
     return Response.json({ transaction }, { status: 201 })

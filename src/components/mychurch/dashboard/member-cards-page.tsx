@@ -145,36 +145,212 @@ export function MemberCardsPage() {
     window.print()
   }
 
-  function handleDownload() {
-    // Print with the card visible is the most reliable cross-platform way;
-    // this triggers the print/save dialog on mobile & desktop.
-    handlePrint()
-  }
+  async function handleDownload() {
+    if (!cardData || !selectedMember) return
+    toast.info("Génération de l'image HD recto/verso en cours...")
 
-  function handleShare() {
-    if (cardData) {
-      const shareText = `Carte de membre MYCHURCH\n${memberName}\nN° ${cardData.cardNumber}\n${churchName}\n${new Date(cardData.createdAt).toLocaleDateString('fr-FR')}`
-
-      if (navigator.share) {
-        navigator.share({
-          title: `Carte - ${memberName}`,
-          text: shareText,
-        }).catch(() => {
-          // User cancelled - fall through to clipboard
-          copyToClipboard(shareText)
-        })
-      } else {
-        copyToClipboard(shareText)
-      }
-    }
-  }
-
-  async function copyToClipboard(text: string) {
     try {
-      await navigator.clipboard.writeText(text)
-      toast.success('Informations copiées dans le presse-papiers !')
-    } catch {
-      toast.error('Impossible de copier')
+      const canvas = document.createElement('canvas')
+      const width = 1000
+      const cardHeight = 630
+      const gap = 40
+      const padding = 50
+      const totalHeight = padding * 2 + cardHeight * 2 + gap
+
+      canvas.width = width
+      canvas.height = totalHeight
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      // Opaque White Background
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, width, totalHeight)
+
+      const drawRoundRect = (x: number, y: number, w: number, h: number, r: number) => {
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + w - r, y)
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+        ctx.lineTo(x + w, y + h - r)
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+        ctx.lineTo(x + r, y + h)
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+        ctx.lineTo(x, y + r)
+        ctx.quadraticCurveTo(x, y, x + r, y)
+        ctx.closePath()
+      }
+
+      const loadImage = (src: string): Promise<HTMLImageElement> => {
+        return new Promise((resolve) => {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.onload = () => resolve(img)
+          img.onerror = () => resolve(img)
+          img.src = src
+        })
+      }
+
+      const cardWidth = 900
+      const cardX = (width - cardWidth) / 2
+      const frontY = padding
+      const backY = padding + cardHeight + gap
+
+      // RECTO / FRONT
+      ctx.save()
+      drawRoundRect(cardX, frontY, cardWidth, cardHeight, 32)
+      ctx.clip()
+
+      const grad = ctx.createLinearGradient(cardX, frontY, cardX + cardWidth, frontY + cardHeight)
+      grad.addColorStop(0, '#1d4ed8')
+      grad.addColorStop(0.5, '#1e40af')
+      grad.addColorStop(1, '#0f172a')
+      ctx.fillStyle = grad
+      ctx.fillRect(cardX, frontY, cardWidth, cardHeight)
+
+      const logoSrc = auth.churchLogo || '/logo-mychurch.png'
+      const logoImg = await loadImage(logoSrc)
+      if (logoImg.width) {
+        ctx.drawImage(logoImg, cardX + cardWidth / 2 - 30, frontY + 30, 60, 60)
+      }
+
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = 'bold 22px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(churchName.toUpperCase(), cardX + cardWidth / 2, frontY + 120)
+
+      const photoX = cardX + cardWidth / 2
+      const photoY = frontY + 230
+      const photoR = 70
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(photoX, photoY, photoR, 0, Math.PI * 2)
+      ctx.closePath()
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'
+      ctx.lineWidth = 6
+      ctx.stroke()
+      ctx.clip()
+
+      if (selectedMember.photo) {
+        const memberImg = await loadImage(selectedMember.photo)
+        if (memberImg.width) {
+          ctx.drawImage(memberImg, photoX - photoR, photoY - photoR, photoR * 2, photoR * 2)
+        }
+      } else {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
+        ctx.fillRect(photoX - photoR, photoY - photoR, photoR * 2, photoR * 2)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.font = 'bold 44px sans-serif'
+        ctx.fillText(`${selectedMember.firstName[0]}${selectedMember.lastName[0]}`, photoX, photoY + 15)
+      }
+      ctx.restore()
+
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = 'bold 36px sans-serif'
+      ctx.fillText(memberName, cardX + cardWidth / 2, frontY + 360)
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+      ctx.font = 'bold 22px monospace'
+      ctx.fillText(formatCardNumber(cardData.cardNumber), cardX + cardWidth / 2, frontY + 410)
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
+      ctx.font = 'bold 18px sans-serif'
+      ctx.fillText('MEMBER CARD', cardX + cardWidth / 2, frontY + 540)
+      ctx.restore()
+
+      // SEPARATION LINE (5mm)
+      const lineY = frontY + cardHeight + gap / 2
+      ctx.strokeStyle = '#CBD5E1'
+      ctx.lineWidth = 2
+      ctx.setLineDash([10, 10])
+      ctx.beginPath()
+      ctx.moveTo(cardX, lineY)
+      ctx.lineTo(cardX + cardWidth, lineY)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // VERSO / BACK
+      ctx.save()
+      drawRoundRect(cardX, backY, cardWidth, cardHeight, 32)
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fill()
+      ctx.strokeStyle = '#E2E8F0'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.clip()
+
+      ctx.fillStyle = '#0F172A'
+      ctx.fillRect(cardX, backY, cardWidth, 100)
+
+      if (logoImg.width) {
+        ctx.drawImage(logoImg, cardX + 40, backY + 125, 50, 50)
+      }
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#0F172A'
+      ctx.font = 'bold 24px sans-serif'
+      ctx.fillText(churchName, cardX + 110, backY + 150)
+      ctx.fillStyle = '#64748B'
+      ctx.font = '16px sans-serif'
+      ctx.fillText('Carte de membre officielle', cardX + 110, backY + 175)
+
+      const gridY = backY + 230
+      ctx.font = 'bold 14px sans-serif'
+      ctx.fillStyle = '#94A3B8'
+
+      ctx.fillText('EMAIL', cardX + 40, gridY)
+      ctx.fillText('TÉLÉPHONE', cardX + 460, gridY)
+      ctx.fillText('DÉPARTEMENT', cardX + 40, gridY + 60)
+      ctx.fillText('URGENCE', cardX + 460, gridY + 60)
+
+      ctx.font = 'bold 18px sans-serif'
+      ctx.fillStyle = '#1E293B'
+      ctx.fillText(selectedMember.email || '—', cardX + 40, gridY + 25)
+      ctx.fillText(selectedMember.phone || '—', cardX + 460, gridY + 25)
+      ctx.fillText(selectedMember.department || '—', cardX + 40, gridY + 85)
+      const emergency = [selectedMember.emergencyContactName, selectedMember.emergencyContactPhone].filter(Boolean).join(' ') || '—'
+      ctx.fillText(emergency, cardX + 460, gridY + 85)
+
+      const footerY = backY + 460
+      if (cardData.qrCode) {
+        const qrImg = await loadImage(cardData.qrCode)
+        if (qrImg.width) {
+          ctx.drawImage(qrImg, cardX + 40, footerY, 110, 110)
+        }
+      }
+
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#64748B'
+      ctx.font = 'bold 18px monospace'
+      ctx.fillText(formatCardNumber(cardData.cardNumber), cardX + 170, footerY + 50)
+      ctx.font = '16px sans-serif'
+      ctx.fillText(new Date(cardData.createdAt).toLocaleDateString('fr-FR'), cardX + 170, footerY + 80)
+
+      ctx.textAlign = 'right'
+      ctx.font = 'italic 16px sans-serif'
+      ctx.fillStyle = '#94A3B8'
+      ctx.fillText('Created by Henock Aduma', cardX + cardWidth - 40, footerY + 80)
+      ctx.restore()
+
+      // Convert to Blob & trigger download
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          toast.error("Erreur de génération d'image")
+          return
+        }
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'carte_recto_verso.png'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        setTimeout(() => URL.revokeObjectURL(url), 5000)
+        toast.success('Image recto/verso téléchargée !')
+      }, 'image/png', 1.0)
+    } catch (err) {
+      console.error(err)
+      toast.error('Erreur lors du téléchargement')
     }
   }
 
@@ -185,7 +361,6 @@ export function MemberCardsPage() {
   }
 
   function formatCardNumber(num: string): string {
-    // Display as MC-XXXXXXXX format
     const parts = num.split('-')
     if (parts.length >= 3) {
       return `MC-${parts[1]}${parts[2]}`
@@ -281,22 +456,18 @@ export function MemberCardsPage() {
               )}
             </Button>
             {cardData && (
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-2" onClick={handlePrint}>
+              <div className="flex gap-3">
+                <Button variant="default" className="flex-1 gap-2 h-10" onClick={handlePrint}>
                   <Printer className="h-4 w-4" />
-                  Imprimer
-                </Button>
-                <Button variant="outline" className="flex-1 gap-2" onClick={handleShare}>
-                  <Copy className="h-4 w-4" />
-                  Partager
+                  Imprimer (Recto/Verso)
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 gap-2"
+                  className="flex-1 gap-2 h-10"
                   onClick={handleDownload}
                 >
                   <Download className="h-4 w-4" />
-                  Télécharger
+                  Télécharger (Image PNG)
                 </Button>
               </div>
             )}
@@ -637,110 +808,92 @@ export function MemberCardsPage() {
 
       {/* AREA PRINTABLE DEDICATED TO WINDOW.PRINT() */}
       {cardData && selectedMember && (
-        <div id="member-card-print-area" className="p-8 bg-white text-black font-sans">
-          <div className="max-w-2xl mx-auto space-y-8">
-            <div className="text-center pb-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">{churchName}</h2>
-              <p className="text-sm text-gray-500">Carte de Membre Officielle — Impression Recto / Verso</p>
+        <div id="member-card-print-area">
+          {/* PAGE 1 — RECTO */}
+          <div className="print-page-1">
+            <div className="text-center mb-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">FACE 1 — RECTO</p>
+              <h2 className="text-lg font-bold text-gray-800 mt-1">{churchName}</h2>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start justify-center">
-              {/* RECTO / FRONT PRINT */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-500 text-center">FACE 1 — RECTO</p>
-                <div className="w-[336px] h-[212px] mx-auto rounded-2xl overflow-hidden shadow-md border border-gray-300 relative bg-gradient-to-br from-blue-600 via-blue-800 to-blue-950 p-5 text-white flex flex-col justify-between"
-                  style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
-                >
-                  <div className="flex flex-col items-center gap-1.5">
-                    <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Logo" className="w-8 h-8 object-contain" />
-                    <span className="text-[10px] font-bold tracking-[0.25em] uppercase text-white/90">
-                      {churchName}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-16 w-16 rounded-full border-2 border-white/40 overflow-hidden bg-white/10 flex items-center justify-center">
-                      {selectedMember.photo ? (
-                        <img src={selectedMember.photo} alt={memberName} className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-lg font-bold">
-                          {selectedMember.firstName[0]}{selectedMember.lastName[0]}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-base font-bold tracking-wide text-center leading-tight">
-                      {memberName}
-                    </p>
-                    <p className="text-[10px] font-mono tracking-[0.15em] text-white/70">
-                      {formatCardNumber(cardData.cardNumber)}
-                    </p>
-                  </div>
-
-                  <div className="text-center">
-                    <p className="text-[9px] font-bold tracking-[0.3em] text-white/50 uppercase">
-                      MEMBER CARD
-                    </p>
-                  </div>
-                </div>
+            <div
+              className="w-[400px] h-[252px] rounded-2xl overflow-hidden shadow-lg relative flex flex-col justify-between p-6 text-white"
+              style={{
+                background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 50%, #0f172a 100%)',
+                WebkitPrintColorAdjust: 'exact',
+                printColorAdjust: 'exact',
+              }}
+            >
+              <div className="flex flex-col items-center gap-1.5">
+                <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Logo" className="w-10 h-10 object-contain" />
+                <span className="text-[11px] font-bold tracking-[0.25em] uppercase text-white/90">{churchName}</span>
               </div>
-
-              {/* VERSO / BACK PRINT */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-gray-500 text-center">FACE 2 — VERSO</p>
-                <div className="w-[336px] h-[212px] mx-auto rounded-2xl overflow-hidden shadow-md border border-gray-300 relative bg-white p-5 text-gray-900 flex flex-col justify-between"
-                  style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
-                >
-                  <div className="absolute top-0 left-0 right-0 h-10 bg-gray-900" />
-
-                  <div className="mt-10 flex items-center gap-2.5">
-                    <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Logo" className="h-8 w-8 object-contain" />
-                    <div>
-                      <p className="text-xs font-bold text-gray-900">{churchName}</p>
-                      <p className="text-[9px] text-gray-500">Carte de membre officielle</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] my-1">
-                    <div>
-                      <span className="text-gray-400 block uppercase">Email</span>
-                      <span className="font-semibold text-gray-800 truncate block">{selectedMember.email || '—'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block uppercase">Téléphone</span>
-                      <span className="font-semibold text-gray-800 truncate block">{selectedMember.phone || '—'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block uppercase">Département</span>
-                      <span className="font-semibold text-gray-800 truncate block">{selectedMember.department || '—'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block uppercase">Urgence</span>
-                      <span className="font-semibold text-gray-800 truncate block">
-                        {[selectedMember.emergencyContactName, selectedMember.emergencyContactPhone].filter(Boolean).join(' ') || '—'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-end justify-between pt-2 border-t border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 border border-gray-200 rounded p-0.5">
-                        {cardData.qrCode ? (
-                          <img src={cardData.qrCode} alt="QR Code" className="h-full w-full object-contain" />
-                        ) : null}
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-mono text-gray-500">{formatCardNumber(cardData.cardNumber)}</p>
-                        <p className="text-[8px] text-gray-400">{new Date(cardData.createdAt).toLocaleDateString('fr-FR')}</p>
-                      </div>
-                    </div>
-                    <span className="text-[8px] text-gray-400 italic">Created by Henock Aduma</span>
-                  </div>
+              <div className="flex flex-col items-center gap-2">
+                <div className="h-18 w-18 rounded-full border-2 border-white/40 overflow-hidden bg-white/10 flex items-center justify-center" style={{ width: 72, height: 72 }}>
+                  {selectedMember.photo ? (
+                    <img src={selectedMember.photo} alt={memberName} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xl font-bold">{selectedMember.firstName[0]}{selectedMember.lastName[0]}</span>
+                  )}
                 </div>
+                <p className="text-base font-bold tracking-wide text-center">{memberName}</p>
+                <p className="text-[10px] font-mono tracking-[0.15em] text-white/70">{formatCardNumber(cardData.cardNumber)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[9px] font-bold tracking-[0.3em] text-white/50 uppercase">MEMBER CARD</p>
               </div>
             </div>
+          </div>
 
-            <div className="text-center pt-6 text-[10px] text-gray-400 border-t border-gray-200">
-              Imprimé depuis MYCHURCH App • {new Date().toLocaleDateString('fr-FR')}
+          {/* PAGE 2 — VERSO */}
+          <div className="print-page-2">
+            <div className="text-center mb-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">FACE 2 — VERSO</p>
+              <h2 className="text-lg font-bold text-gray-800 mt-1">{churchName}</h2>
+            </div>
+            <div
+              className="w-[400px] h-[252px] rounded-2xl overflow-hidden shadow-lg relative bg-white flex flex-col justify-between p-5 text-gray-900"
+              style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
+            >
+              <div className="absolute top-0 left-0 right-0 h-11" style={{ background: '#0F172A' }} />
+              <div className="mt-12 flex items-center gap-2.5">
+                <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Logo" className="h-9 w-9 object-contain" />
+                <div>
+                  <p className="text-xs font-bold text-gray-900">{churchName}</p>
+                  <p className="text-[9px] text-gray-500">Carte de membre officielle</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px]">
+                <div>
+                  <span className="text-gray-400 uppercase block">Email</span>
+                  <span className="font-semibold text-gray-800 block truncate">{selectedMember.email || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase block">Téléphone</span>
+                  <span className="font-semibold text-gray-800 block truncate">{selectedMember.phone || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase block">Département</span>
+                  <span className="font-semibold text-gray-800 block truncate">{selectedMember.department || '—'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 uppercase block">Urgence</span>
+                  <span className="font-semibold text-gray-800 block truncate">
+                    {[selectedMember.emergencyContactName, selectedMember.emergencyContactPhone].filter(Boolean).join(' ') || '—'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-end justify-between pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="h-11 w-11 border border-gray-200 rounded p-0.5">
+                    {cardData.qrCode && <img src={cardData.qrCode} alt="QR" className="h-full w-full object-contain" />}
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-mono text-gray-500">{formatCardNumber(cardData.cardNumber)}</p>
+                    <p className="text-[8px] text-gray-400">{new Date(cardData.createdAt).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                </div>
+                <span className="text-[8px] text-gray-400 italic">Created by Henock Aduma</span>
+              </div>
             </div>
           </div>
         </div>
