@@ -19,6 +19,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -46,11 +47,15 @@ interface Member {
   id: string
   firstName: string
   lastName: string
+  type?: string
   phone: string | null
   email: string | null
   address: string | null
   department: string | null
   function: string | null
+  salary?: number | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
   photo: string | null
   status: string
   joinDate: string
@@ -62,8 +67,9 @@ interface DepartmentInfo {
 }
 
 const emptyMember = {
-  firstName: '', lastName: '', phone: '', email: '', address: '',
-  department: '', function: '', photo: null as string | null,
+  firstName: '', lastName: '', type: 'member' as 'member' | 'personnel', phone: '', email: '', address: '',
+  department: '', function: '', salary: '', emergencyContactName: '', emergencyContactPhone: '',
+  photo: null as string | null,
 }
 
 /* ─── Avatar color palette based on first letter ─── */
@@ -301,11 +307,15 @@ export function MembersPage() {
     setForm({
       firstName: member.firstName,
       lastName: member.lastName,
+      type: (member.type === 'personnel' ? 'personnel' : 'member') as 'member' | 'personnel',
       phone: member.phone || '',
       email: member.email || '',
       address: member.address || '',
       department: member.department || '',
       function: member.function || '',
+      salary: member.salary != null ? String(member.salary) : '',
+      emergencyContactName: member.emergencyContactName || '',
+      emergencyContactPhone: member.emergencyContactPhone || '',
       photo: member.photo,
     })
     setDialogOpen(true)
@@ -341,7 +351,11 @@ export function MembersPage() {
           'Authorization': `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          salary: form.type === 'personnel' && form.salary !== '' ? parseFloat(form.salary) : null,
+          department: form.type === 'personnel' ? form.department || null : form.department,
+        }),
       })
       if (res.ok) {
         toast.success(editingMember ? 'Membre modifié' : 'Membre ajouté')
@@ -771,9 +785,14 @@ export function MembersPage() {
                       <TableCell className="hidden lg:table-cell">{member.email || '—'}</TableCell>
                       <TableCell className="hidden lg:table-cell">{member.department || '—'}</TableCell>
                       <TableCell>
-                        <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
-                          {member.status === 'active' ? 'Actif' : 'Inactif'}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                            {member.type === 'personnel' ? 'Personnel' : 'Membre'}
+                          </Badge>
+                          <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
+                            {member.status === 'active' ? 'Actif' : 'Inactif'}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -1036,6 +1055,44 @@ export function MembersPage() {
                 <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Nom" />
               </div>
             </div>
+
+            {/* Type: Membre / Personnel */}
+            <div className="space-y-2">
+              <Label>Type de registre</Label>
+              <RadioGroup
+                value={form.type}
+                onValueChange={(v) => setForm({ ...form, type: v as 'member' | 'personnel' })}
+                className="grid grid-cols-2 gap-3"
+              >
+                <label
+                  className={`flex items-center gap-2 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    form.type === 'member'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted/40'
+                  }`}
+                >
+                  <RadioGroupItem value="member" id="type-member" />
+                  <div>
+                    <p className="text-sm font-medium">Membre</p>
+                    <p className="text-xs text-muted-foreground">Chorale, accueil, etc.</p>
+                  </div>
+                </label>
+                <label
+                  className={`flex items-center gap-2 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    form.type === 'personnel'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted/40'
+                  }`}
+                >
+                  <RadioGroupItem value="personnel" id="type-personnel" />
+                  <div>
+                    <p className="text-sm font-medium">Personnel</p>
+                    <p className="text-xs text-muted-foreground">Salarié (salaire, jamais sur carte)</p>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Téléphone</Label>
@@ -1050,14 +1107,72 @@ export function MembersPage() {
               <Label>Adresse</Label>
               <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Adresse complète" />
             </div>
+            <div className="space-y-2">
+              <Label>{form.type === 'personnel' ? 'Salaire (USD) — optionnel, jamais sur la carte' : 'Département'}</Label>
+              {form.type === 'personnel' ? (
+                <Input
+                  value={form.salary}
+                  onChange={(e) => setForm({ ...form, salary: e.target.value })}
+                  placeholder="Ex: 500"
+                  type="number"
+                  min="0"
+                />
+              ) : (
+                <>
+                  <Input
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    placeholder="Département"
+                    list="department-list"
+                  />
+                  <datalist id="department-list">
+                    {departments.map((d) => (
+                      <option key={d.name} value={d.name} />
+                    ))}
+                  </datalist>
+                  {departments.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Départements existants : {departments.slice(0, 6).map((d) => d.name).join(', ')}{departments.length > 6 ? '…' : ''}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Département</Label>
-                <Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Département" />
-              </div>
               <div className="space-y-2">
                 <Label>Fonction</Label>
                 <Input value={form.function} onChange={(e) => setForm({ ...form, 'function': e.target.value })} placeholder="Fonction" />
+              </div>
+              {form.type === 'personnel' && (
+                <div className="space-y-2">
+                  <Label>Département (optionnel)</Label>
+                  <Input
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    placeholder="Département"
+                    list="department-list-2"
+                  />
+                  <datalist id="department-list-2">
+                    {departments.map((d) => (
+                      <option key={d.name} value={d.name} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
+            </div>
+
+            {/* Contact d'urgence */}
+            <div className="rounded-lg border bg-muted/10 p-3 space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">Contact en cas d'urgence</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Nom du contact</Label>
+                  <Input value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.target.value })} placeholder="Nom" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone</Label>
+                  <Input value={form.emergencyContactPhone} onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })} placeholder="+243 ..." />
+                </div>
               </div>
             </div>
           </div>

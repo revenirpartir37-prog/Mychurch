@@ -17,11 +17,15 @@ async function getAuth(request: NextRequest) {
 const createMemberSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
+  type: z.enum(['member', 'personnel']).optional(),
   phone: z.string().optional().nullable(),
   email: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
   address: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
   function: z.string().optional().nullable(),
+  salary: z.number().optional().nullable(),
+  emergencyContactName: z.string().optional().nullable(),
+  emergencyContactPhone: z.string().optional().nullable(),
   photo: z.string().optional().nullable(),
   joinDate: z.string().optional().nullable(),
 })
@@ -29,11 +33,15 @@ const createMemberSchema = z.object({
 const updateMemberSchema = z.object({
   firstName: z.string().min(1, 'First name is required').optional(),
   lastName: z.string().min(1, 'Last name is required').optional(),
+  type: z.enum(['member', 'personnel']).optional(),
   phone: z.string().optional().nullable(),
   email: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
   address: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
   function: z.string().optional().nullable(),
+  salary: z.number().optional().nullable(),
+  emergencyContactName: z.string().optional().nullable(),
+  emergencyContactPhone: z.string().optional().nullable(),
   photo: z.string().optional().nullable(),
   status: z.enum(['active', 'inactive']).optional(),
 })
@@ -116,11 +124,15 @@ export async function POST(request: NextRequest) {
         churchId: auth.churchId,
         firstName: data.firstName,
         lastName: data.lastName,
+        type: data.type || 'member',
         phone: data.phone || null,
         email: data.email || null,
         address: data.address || null,
         department: data.department || null,
         function: data.function || null,
+        salary: data.salary ?? null,
+        emergencyContactName: data.emergencyContactName || null,
+        emergencyContactPhone: data.emergencyContactPhone || null,
         photo: data.photo || null,
         joinDate: data.joinDate ? new Date(data.joinDate) : new Date(),
       },
@@ -172,11 +184,15 @@ export async function PUT(request: NextRequest) {
     const updateData: Record<string, unknown> = {}
     if (data.firstName !== undefined) updateData.firstName = data.firstName
     if (data.lastName !== undefined) updateData.lastName = data.lastName
+    if (data.type !== undefined) updateData.type = data.type
     if (data.phone !== undefined) updateData.phone = data.phone || null
     if (data.email !== undefined) updateData.email = data.email || null
     if (data.address !== undefined) updateData.address = data.address || null
     if (data.department !== undefined) updateData.department = data.department || null
     if (data.function !== undefined) updateData.function = data.function || null
+    if (data.salary !== undefined) updateData.salary = data.salary ?? null
+    if (data.emergencyContactName !== undefined) updateData.emergencyContactName = data.emergencyContactName || null
+    if (data.emergencyContactPhone !== undefined) updateData.emergencyContactPhone = data.emergencyContactPhone || null
     if (data.photo !== undefined) updateData.photo = data.photo || null
     if (data.status !== undefined) updateData.status = data.status
 

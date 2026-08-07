@@ -30,8 +30,12 @@ interface Member {
   id: string
   firstName: string
   lastName: string
-  photo: string | null
+  phone: string | null
+  email: string | null
   department: string | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
+  photo: string | null
 }
 
 interface CardData {
@@ -400,22 +404,48 @@ export function MemberCardsPage() {
                           <div className="absolute top-0 left-0 right-0 h-14 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900" />
 
                           {/* Church info */}
-                          <div className="mt-16 space-y-2">
+                          <div className="mt-16 flex items-center gap-3">
                             <img
                               src={auth.churchLogo || '/logo-mychurch.png'}
                               alt="Church Logo"
-                              className="h-12 w-12 object-contain"
+                              className="h-10 w-10 object-contain rounded"
                             />
-                            <p className="text-sm font-bold text-gray-900 tracking-wide">
-                              {churchName}
-                            </p>
-                            <p className="text-xs text-gray-500 leading-relaxed">
-                              Kinshasa, République Démocratique du Congo
-                            </p>
+                            <div>
+                              <p className="text-sm font-bold text-gray-900 tracking-wide">
+                                {churchName}
+                              </p>
+                              <p className="text-xs text-gray-500">Kinshasa, RDC</p>
+                            </div>
+                          </div>
+
+                          {/* Member contact details on back */}
+                          <div className="space-y-1.5 mt-3">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                              <div className="min-w-0">
+                                <p className="text-[9px] uppercase tracking-wider text-gray-400">Email</p>
+                                <p className="text-xs text-gray-700 font-medium truncate">{selectedMember.email || '—'}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[9px] uppercase tracking-wider text-gray-400">Téléphone</p>
+                                <p className="text-xs text-gray-700 font-medium truncate">{selectedMember.phone || '—'}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[9px] uppercase tracking-wider text-gray-400">Département</p>
+                                <p className="text-xs text-gray-700 font-medium truncate">{selectedMember.department || '—'}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[9px] uppercase tracking-wider text-gray-400">Urgence</p>
+                                <p className="text-xs text-gray-700 font-medium truncate">
+                                  {[selectedMember.emergencyContactName, selectedMember.emergencyContactPhone]
+                                    .filter(Boolean)
+                                    .join(' · ') || '—'}
+                                </p>
+                              </div>
+                            </div>
                           </div>
 
                           {/* QR Code + Creator */}
-                          <div className="flex items-end justify-between">
+                          <div className="flex items-end justify-between mt-auto pt-3">
                             {/* QR Code */}
                             <div className="flex items-center gap-3">
                               <div className="h-14 w-14 rounded-lg border-2 border-gray-200 bg-gray-50 flex items-center justify-center">

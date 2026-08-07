@@ -21,6 +21,7 @@ model Church {
   email       String   @unique
   phone       String?
   logo        String?
+  registrationSlug String? @unique
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -74,11 +75,15 @@ model Member {
   churchId    String
   firstName   String
   lastName    String
+  type        String   @default("member") // member, personnel
   phone       String?
   email       String?
   address     String?
   department  String?
   function    String?
+  salary      Float?
+  emergencyContactName  String?
+  emergencyContactPhone String?
   photo       String?
   status      String   @default("active") // active, inactive
   joinDate    DateTime @default(now())

@@ -26,11 +26,15 @@ interface Member {
   id: string
   firstName: string
   lastName: string
+  type?: string
   phone: string | null
   email: string | null
   address: string | null
   department: string | null
   function: string | null
+  salary?: number | null
+  emergencyContactName?: string | null
+  emergencyContactPhone?: string | null
   photo: string | null
   status: string
   joinDate: string
@@ -215,6 +219,9 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
                     <Badge variant={member.status === 'active' ? 'default' : 'secondary'}>
                       {member.status === 'active' ? 'Actif' : 'Inactif'}
                     </Badge>
+                    <Badge variant="outline" className="text-xs gap-1">
+                      {member.type === 'personnel' ? 'Personnel' : 'Membre'}
+                    </Badge>
                     {member.department && (
                       <Badge variant="outline" className="text-xs gap-1">
                         <Building2 className="h-3 w-3" />
@@ -243,6 +250,16 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
                 <InfoRow icon={Mail} label="Email" value={member.email} />
                 <InfoRow icon={Phone} label="Téléphone" value={member.phone} />
                 <InfoRow icon={MapPin} label="Adresse" value={member.address} />
+                {member.type === 'personnel' && member.salary != null && (
+                  <InfoRow icon={Wallet} label="Salaire" value={`${member.salary.toLocaleString('fr-FR')} USD`} />
+                )}
+                {member.emergencyContactName || member.emergencyContactPhone ? (
+                  <InfoRow
+                    icon={Phone}
+                    label="Contact d'urgence"
+                    value={[member.emergencyContactName, member.emergencyContactPhone].filter(Boolean).join(' · ') || null}
+                  />
+                ) : null}
                 <InfoRow
                   icon={CalendarDays}
                   label="Date d'inscription"
