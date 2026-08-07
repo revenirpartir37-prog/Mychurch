@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mychurch-v1'
+const CACHE_NAME = 'mychurch-v2'
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -25,18 +25,27 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+// NETWORK-FIRST : on cherche le réseau en priorité pour toujours servir la
+// dernière version déployée (sinon un vieux bundle en cache persistait,
+// y compris l'ancien canal Realtime 'mychurch-realtime'). Le cache ne sert
+// que de secours hors-ligne ou en cas d'erreur réseau.
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return
-  if (event.request.url.includes('/api/')) return
+  const { request } = event
+  if (request.method !== 'GET') return
+  if (request.url.includes('/api/')) return
+
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) return response
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') return response
+    fetch(request)
+      .then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response
+        }
         const responseToCache = response.clone()
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache))
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, responseToCache))
         return response
       })
-    })
+      .catch(() =>
+        caches.match(request).then((cached) => cached || caches.match('/'))
+      )
   )
 })
