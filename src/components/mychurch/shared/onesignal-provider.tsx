@@ -7,8 +7,31 @@ declare global {
   interface Window {
     OneSignal?: {
       init: (config: Record<string, unknown>) => Promise<void>
+      login: (externalId: string) => Promise<void>
+      logout: () => Promise<void>
+      User?: {
+        addTag: (tag: string, value: string) => Promise<void>
+        removeTag: (tag: string) => Promise<void>
+        getOnesignalId: () => Promise<string | undefined>
+      }
+      // Namespace Notifications (SDK v16 / web) pour la souscription & permission
+      Notifications?: {
+        getPermissionStatus: () => Promise<unknown>
+        requestPermission: () => Promise<unknown>
+        addListener: (event: string, callback: () => void) => void
+      }
     }
   }
+}
+
+// Associe l'utilisateur connecté à OneSignal (external user id) pour les push ciblées.
+export function onesignalLogin(userId: string) {
+  window.OneSignal?.login(userId).catch(() => {})
+}
+
+// Dissocie l'utilisateur à la déconnexion.
+export function oneSignalLogout() {
+  window.OneSignal?.logout().catch(() => {})
 }
 
 export function OneSignalProvider({ children }: { children: React.ReactNode }) {

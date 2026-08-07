@@ -42,6 +42,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
+import { oneSignalLogout } from '@/components/mychurch/shared/onesignal-provider'
 
 interface UserProfile {
   firstName: string
@@ -1055,6 +1056,7 @@ export function SettingsPage() {
             variant="outline"
             className="w-full gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
             onClick={() => {
+              oneSignalLogout()
               logout()
               toast.success('Déconnexion réussie')
             }}

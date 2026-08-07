@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { sendPushNotification } from '@/lib/onesignal'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -107,6 +108,13 @@ export async function POST(request: NextRequest) {
         message: data.message,
         type: data.type,
       },
+    })
+
+    // Envoie une push OneSignal au destinataire (non bloquant)
+    await sendPushNotification({
+      title: data.title,
+      message: data.message,
+      userIds: [targetUser.firebaseUid || targetUser.id],
     })
 
     return Response.json({ notification }, { status: 201 })

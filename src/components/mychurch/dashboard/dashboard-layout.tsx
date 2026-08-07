@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '../shared/app-sidebar'
 import { AppHeader } from '../shared/app-header'
 import { GlobalSearch } from '../shared/global-search'
+import { NotificationsPrompt } from '../shared/notifications-prompt'
 import { useState } from 'react'
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <GlobalSearch />
+        <NotificationsPrompt />
       </SidebarInset>
     </SidebarProvider>
   )

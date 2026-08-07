@@ -9,6 +9,7 @@ import { ROLE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { CREATOR } from '@/lib/constants'
 import { auth, googleProvider, firebaseAvailable, upsertFirestoreUser } from '@/firebase'
+import { onesignalLogin } from '@/components/mychurch/shared/onesignal-provider'
 import { signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth'
 import {
   Card,
@@ -93,6 +94,9 @@ export function LoginPage() {
         firstName: result.user.firstName,
         lastName: result.user.lastName,
       })
+
+      // Associe l'utilisateur à OneSignal pour les push ciblées (id Supabase)
+      onesignalLogin(result.user.id)
 
       toast.success('Connexion réussie !')
       setCurrentView('dashboard')

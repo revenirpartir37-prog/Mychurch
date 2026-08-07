@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
 import { createSupabaseUser } from '@/lib/supabase'
+import { sendWelcomeEmail } from '@/lib/emails'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
@@ -121,6 +122,15 @@ export async function POST(request: NextRequest) {
       action: 'register',
       details: `Inscription de l'église "${church.name}" par ${data.firstName} ${data.lastName} (${data.email})`,
     })
+
+    // Email de bienvenue avec les identifiants (non bloquant)
+    sendWelcomeEmail({
+      to: data.email,
+      firstName: data.firstName,
+      churchName: church.name,
+      email: data.email,
+      password: data.password,
+    }).catch((e) => console.error('Welcome email failed:', e))
 
     return Response.json({
       user: userWithoutPassword,
