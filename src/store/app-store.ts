@@ -69,7 +69,15 @@ export const useAppStore = create<AppState>()(
       auth: initialAuth,
       setAuth: (partial) =>
         set((state) => ({
-          auth: { ...state.auth, ...partial, isAuthenticated: !!partial.token },
+          auth: {
+            ...state.auth,
+            ...partial,
+            // Ne modifie isAuthenticated QUE si un token (ou une déconnexion) est explicitement passé.
+            // Une mise à jour partielle (ex. logo) doit préserver l'état de connexion existant.
+            isAuthenticated: partial.token !== undefined
+              ? !!partial.token
+              : state.auth.isAuthenticated,
+          },
         })),
       logout: () => {
         if (auth) {
