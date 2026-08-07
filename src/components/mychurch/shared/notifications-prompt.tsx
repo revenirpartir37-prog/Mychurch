@@ -5,48 +5,70 @@ import { useAppStore } from '@/store/app-store'
 import { Bell, BellRing, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-// Demande d'autorisation des notifications push à l'entrée de l'application.
+// Demande d'autorisation des notifications push à l'ouverture de l'application.
+// S'affiche À CHAQUE OUVERTURE tant que l'utilisateur n'a PAS accepté (abonnement actif).
 export function NotificationsPrompt() {
   const isAuthenticated = useAppStore((s) => s.auth.isAuthenticated)
   const [visible, setVisible] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) return
-
-    // Le prompt ne s'affiche que si le SDK OneSignal est présent.
     if (typeof window === 'undefined' || !window.OneSignal) return
 
-    // Ne pas re-demander si déjà abonné ou si l'utilisateur a refusé ce prompt précédemment.
-    const dismissed = localStorage.getItem('onesignal-prompt-dismissed')
-    let subscribed: boolean | undefined
+    // Attendre que le SDK soit chargé puis vérifier le vrai état d'abonnement.
+    let mounted = true
+    const check = () => {
+      if (!mounted) return
+      try {
+        // getOnesignalId => id si abonné, undefined sinon.
+        window.OneSignal?.User?.getOnesignalId?.().then((id) => {
+          if (!mounted) return
+          setReady(true)
+          // S'affiche seulement si l'utilisateur N'EST PAS encore abonné.
+          setVisible(!id)
+        }).catch(() => {
+          if (!mounted) return
+          setReady(true)
+          setVisible(true)
+        })
+      } catch {
+        if (!mounted) return
+        setReady(true)
+        setVisible(true)
+      }
+    }
 
-    window.OneSignal?.Notifications?.getPermissionStatus?.()
-      .then((status: unknown) => {
-        subscribed = !!status
-      })
-      .catch(() => (subscribed = false))
-      .finally(() => {
-        if (!subscribed && dismissed !== '1') setVisible(true)
-      })
+    // SDK peut ne pas être prêt au premier effet.
+    const tries = [1, 5, 15]
+    const timers = tries.map((t) => setTimeout(check, t * 100))
+    check()
+
+    return () => {
+      mounted = false
+      timers.forEach(clearTimeout)
+    }
   }, [isAuthenticated])
 
   async function handleAllow() {
     try {
       await window.OneSignal?.Notifications?.requestPermission()
     } catch {
-      // L'utilisateur peut avoir refusé la permission navigateur.
+      // L'utilisateur a pu refuser la permission navigateur.
     }
-    setVisible(false)
+    // On réévalue : si l'abonnement est actif, on masque pour cette session.
+    window.OneSignal?.User?.getOnesignalId?.().then((id) => {
+      setVisible(!id)
+    }).catch(() => setVisible(false))
   }
 
   function handleDismiss() {
-    try {
-      window.localStorage.setItem('onesignal-prompt-dismissed', '1')
-    } catch {}
+    // Simple fermeture de session : sera représenté à la prochaine ouverture tant que non accepté.
     setVisible(false)
   }
 
-  if (!visible) return null
+  // Ne rien rendre tant que le SDK n'a pas statué (évite un flash).
+  if (!ready || !visible) return null
 
   return (
     <div className="fixed bottom-4 right-4 z-[60] max-w-sm animate-[fadeInUp_0.4s_ease-out]">
