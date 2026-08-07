@@ -20,7 +20,7 @@ const registerSchema = z.object({
   province: z.string().min(1, 'Province is required'),
   country: z.string().min(1, 'Country is required'),
   currency: z.enum(['USD', 'FC', 'EUR']).default('USD'),
-  initialCapital: z.coerce.number().default(0),
+  initialCapital: z.coerce.number().min(1, 'Le capital initial est obligatoire et doit être supérieur à 0'),
   firebaseUid: z.string().optional(),
 })
 

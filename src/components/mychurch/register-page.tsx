@@ -61,7 +61,7 @@ const churchSchema = z.object({
   currency: z.enum(['USD', 'FC', 'EUR'] as const, {
     message: 'La devise est requise',
   }),
-  initialCapital: z.coerce.number().min(0, 'Le capital initial doit être positif').optional().transform(v => v ?? 0),
+  initialCapital: z.coerce.number().min(1, 'Le capital initial est obligatoire et doit être supérieur à 0'),
 })
 
 type AdminFormValues = z.infer<typeof adminSchema>
@@ -106,7 +106,7 @@ export function RegisterPage() {
       province: '',
       country: '',
       currency: 'USD',
-      initialCapital: 0,
+      initialCapital: undefined,
     },
   })
 
@@ -564,16 +564,24 @@ export function RegisterPage() {
                     name="initialCapital"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Capital initial</FormLabel>
+                        <FormLabel className="flex items-center gap-1">
+                          Capital initial de caisse
+                          <span className="text-destructive font-bold">*</span>
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="number"
-                            min={0}
+                            min={1}
                             step={0.01}
-                            placeholder="0"
+                            placeholder="Ex: 5000"
                             {...field}
+                            value={field.value ?? ''}
+                            onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
                           />
                         </FormControl>
+                        <p className="text-[11px] text-muted-foreground">
+                          Montant de départ en caisse physique (dans la devise sélectionnée). Obligatoire.
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -649,10 +657,10 @@ export function RegisterPage() {
                       {CURRENCY_LABELS[churchForm.getValues().currency]}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Capital initial</span>
-                    <span className="font-medium text-foreground">
-                      {churchForm.getValues().initialCapital} {churchForm.getValues().currency}
+                  <div className="flex justify-between items-center py-1 px-2 rounded-md bg-emerald-50 border border-emerald-200">
+                    <span className="text-emerald-700 font-medium">💰 Capital initial de caisse</span>
+                    <span className="font-bold text-emerald-700">
+                      {(churchForm.getValues().initialCapital || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {churchForm.getValues().currency}
                     </span>
                   </div>
                 </div>
