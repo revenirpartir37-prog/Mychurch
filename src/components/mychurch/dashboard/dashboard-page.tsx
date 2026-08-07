@@ -152,21 +152,15 @@ export function DashboardPage() {
       const headers = { 'Authorization': `Bearer ${token}` }
 
       const [
-        membersRes,
         financeRes,
-        eventsRes,
         attendanceRes,
-        transRes,
         membersListRes,
         auditRes,
-        upcomingRes,
+        eventsListRes,
         debtsRes,
       ] = await Promise.allSettled([
-        fetch('/api/members?limit=1', { headers }).then(r => r.json()),
-        fetch('/api/finances?limit=1', { headers }).then(r => r.json()),
-        fetch('/api/events?limit=1', { headers }).then(r => r.json()),
-        fetch('/api/attendance?limit=1', { headers }).then(r => r.json()),
         fetch('/api/finances?limit=5', { headers }).then(r => r.json()),
+        fetch('/api/attendance?limit=1', { headers }).then(r => r.json()),
         fetch('/api/members?limit=5&sort=desc', { headers }).then(r => r.json()),
         fetch('/api/audit-logs?limit=8', { headers }).then(r => r.json()),
         fetch('/api/events?limit=5', { headers }).then(r => r.json()),
@@ -175,13 +169,13 @@ export function DashboardPage() {
           : Promise.resolve(null),
       ])
 
-      const membersData = membersRes.status === 'fulfilled' ? membersRes.value : null
       const financeData = financeRes.status === 'fulfilled' ? financeRes.value : null
-      const eventsData = eventsRes.status === 'fulfilled' ? eventsRes.value : null
       const attendanceData = attendanceRes.status === 'fulfilled' ? attendanceRes.value : null
+      const membersListData = membersListRes.status === 'fulfilled' ? membersListRes.value : null
+      const eventsListData = eventsListRes.status === 'fulfilled' ? eventsListRes.value : null
 
-      const memberTotal = membersData?.pagination?.total ?? membersData?.total ?? 0
-      const eventTotal = eventsData?.pagination?.total ?? eventsData?.total ?? 0
+      const memberTotal = membersListData?.pagination?.total ?? membersListData?.total ?? 0
+      const eventTotal = eventsListData?.pagination?.total ?? eventsListData?.total ?? 0
       const financeTotals = financeData?.totals ?? {}
       const attendanceTotal = attendanceData?.pagination?.total ?? attendanceData?.total ?? 0
 
@@ -193,8 +187,8 @@ export function DashboardPage() {
         monthlyAttendance: attendanceTotal,
       })
 
-      if (transRes.status === 'fulfilled' && transRes.value) {
-        setRecentTransactions(transRes.value.transactions ?? transRes.value.data ?? [])
+      if (financeRes.status === 'fulfilled' && financeRes.value) {
+        setRecentTransactions(financeRes.value.transactions ?? financeRes.value.data ?? [])
       }
 
       if (membersListRes.status === 'fulfilled' && membersListRes.value) {
@@ -205,8 +199,8 @@ export function DashboardPage() {
         setAuditLogs(auditRes.value.logs ?? [])
       }
 
-      if (upcomingRes.status === 'fulfilled' && upcomingRes.value) {
-        const allEvents: UpcomingEvent[] = (upcomingRes.value.events ?? []).map((e: any) => ({
+      if (eventsListRes.status === 'fulfilled' && eventsListRes.value) {
+        const allEvents: UpcomingEvent[] = (eventsListRes.value.events ?? []).map((e: any) => ({
           id: e.id,
           title: e.title,
           type: e.type,

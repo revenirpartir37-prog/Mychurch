@@ -74,44 +74,39 @@ export function MemberCardsPage() {
   const churchName = auth.churchName || 'MYCHURCH'
 
   useEffect(() => {
-    async function fetchMembers() {
+    async function loadData() {
       setLoading(true)
-      try {
-        const res = await fetch('/api/members?status=active&limit=200', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setMembers(data.members || data.data || [])
-        }
-      } catch {
-        toast.error('Erreur de chargement des membres')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchMembers()
-  }, [auth.token])
-
-  useEffect(() => {
-    async function fetchExistingCards() {
       setCardsLoading(true)
       try {
-        const res = await fetch('/api/cards?limit=50', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
+        const [membersRes, cardsRes] = await Promise.all([
+          fetch('/api/members?status=active&limit=200', {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          }),
+          fetch('/api/cards?limit=50', {
+            headers: { Authorization: `Bearer ${auth.token}` },
+          }),
+        ])
+
+        if (membersRes.ok) {
+          const data = await membersRes.json()
+          setMembers(data.members || data.data || [])
+        }
+        if (cardsRes.ok) {
+          const data = await cardsRes.json()
           setExistingCards(data.cards || data.data || [])
         }
       } catch {
-        // silent
+        toast.error('Erreur de chargement des données')
       } finally {
+        setLoading(false)
         setCardsLoading(false)
       }
     }
-    fetchExistingCards()
+    if (auth.token) {
+      loadData()
+    }
   }, [auth.token, cardData])
+
 
   function handleMemberChange(memberId: string) {
     setSelectedMemberId(memberId)
