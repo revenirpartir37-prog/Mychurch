@@ -141,10 +141,6 @@ export function MemberCardsPage() {
     }
   }
 
-  function handlePrint() {
-    window.print()
-  }
-
   async function handleDownload() {
     if (!cardData || !selectedMember) return
     toast.info("Génération de l'image HD recto/verso en cours...")
@@ -456,20 +452,14 @@ export function MemberCardsPage() {
               )}
             </Button>
             {cardData && (
-              <div className="flex gap-3">
-                <Button variant="default" className="flex-1 gap-2 h-10" onClick={handlePrint}>
-                  <Printer className="h-4 w-4" />
-                  Imprimer (Recto/Verso)
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 gap-2 h-10"
-                  onClick={handleDownload}
-                >
-                  <Download className="h-4 w-4" />
-                  Télécharger (Image PNG)
-                </Button>
-              </div>
+              <Button
+                variant="default"
+                className="w-full gap-2 h-10"
+                onClick={handleDownload}
+              >
+                <Download className="h-4 w-4" />
+                Télécharger la carte (Image PNG)
+              </Button>
             )}
           </div>
         </div>
@@ -718,20 +708,22 @@ export function MemberCardsPage() {
           {/* Guide & Directives d'impression */}
           <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-blue-700 dark:text-blue-400">
-                <Printer className="h-4 w-4" />
-                Directives d&apos;impression (Recto &amp; Verso en couleur)
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <Download className="h-4 w-4" />
+                Comment utiliser la carte téléchargée
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-xs text-muted-foreground">
               <p className="leading-relaxed">
-                Pour obtenir un résultat d&apos;impression professionnel du Recto et du Verso :
+                Après avoir cliqué sur <strong>Télécharger la carte</strong>, vous obtenez un fichier
+                image <strong>carte_recto_verso.png</strong> haute définition (1000px) avec le Recto
+                en haut et le Verso en bas.
               </p>
               <ol className="list-decimal list-inside space-y-1.5 font-medium text-foreground">
-                <li>Cliquez sur le bouton <strong>Imprimer</strong> ci-dessus.</li>
-                <li>Dans les paramètres d&apos;impression de votre navigateur, cochez <strong>« Graphiques d&apos;arrière-plan »</strong> (Background graphics) afin de conserver les couleurs et dégradés.</li>
-                <li>Définissez les <strong>Marges</strong> sur <em>« Aucune »</em> ou <em>« Par défaut »</em>.</li>
-                <li>Pour une carte PVC ou plastifiée, imprimez le Recto et le Verso puis découpez le long des pointillés.</li>
+                <li>Ouvrez le fichier <strong>carte_recto_verso.png</strong> sur votre appareil.</li>
+                <li>Imprimez-le via votre imprimante — cochez <strong>« Graphiques d&apos;arrière-plan »</strong> pour conserver les couleurs.</li>
+                <li>Découpez le Recto (partie haute) et le Verso (partie basse) puis assemblez-les.</li>
+                <li>Pour une carte plastifiée, plastifiez les deux faces assemblées.</li>
               </ol>
             </CardContent>
           </Card>
@@ -806,98 +798,8 @@ export function MemberCardsPage() {
         </div>
       )}
 
-      {/* AREA PRINTABLE DEDICATED TO WINDOW.PRINT() */}
-      {cardData && selectedMember && (
-        <div id="member-card-print-area">
-          {/* PAGE 1 — RECTO */}
-          <div className="print-page-1">
-            <div className="text-center mb-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">FACE 1 — RECTO</p>
-              <h2 className="text-lg font-bold text-gray-800 mt-1">{churchName}</h2>
-            </div>
-            <div
-              className="w-[400px] h-[252px] rounded-2xl overflow-hidden shadow-lg relative flex flex-col justify-between p-6 text-white"
-              style={{
-                background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 50%, #0f172a 100%)',
-                WebkitPrintColorAdjust: 'exact',
-                printColorAdjust: 'exact',
-              }}
-            >
-              <div className="flex flex-col items-center gap-1.5">
-                <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Logo" className="w-10 h-10 object-contain" />
-                <span className="text-[11px] font-bold tracking-[0.25em] uppercase text-white/90">{churchName}</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <div className="h-18 w-18 rounded-full border-2 border-white/40 overflow-hidden bg-white/10 flex items-center justify-center" style={{ width: 72, height: 72 }}>
-                  {selectedMember.photo ? (
-                    <img src={selectedMember.photo} alt={memberName} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xl font-bold">{selectedMember.firstName[0]}{selectedMember.lastName[0]}</span>
-                  )}
-                </div>
-                <p className="text-base font-bold tracking-wide text-center">{memberName}</p>
-                <p className="text-[10px] font-mono tracking-[0.15em] text-white/70">{formatCardNumber(cardData.cardNumber)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-[9px] font-bold tracking-[0.3em] text-white/50 uppercase">MEMBER CARD</p>
-              </div>
-            </div>
-          </div>
 
-          {/* PAGE 2 — VERSO */}
-          <div className="print-page-2">
-            <div className="text-center mb-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400">FACE 2 — VERSO</p>
-              <h2 className="text-lg font-bold text-gray-800 mt-1">{churchName}</h2>
-            </div>
-            <div
-              className="w-[400px] h-[252px] rounded-2xl overflow-hidden shadow-lg relative bg-white flex flex-col justify-between p-5 text-gray-900"
-              style={{ WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}
-            >
-              <div className="absolute top-0 left-0 right-0 h-11" style={{ background: '#0F172A' }} />
-              <div className="mt-12 flex items-center gap-2.5">
-                <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Logo" className="h-9 w-9 object-contain" />
-                <div>
-                  <p className="text-xs font-bold text-gray-900">{churchName}</p>
-                  <p className="text-[9px] text-gray-500">Carte de membre officielle</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9px]">
-                <div>
-                  <span className="text-gray-400 uppercase block">Email</span>
-                  <span className="font-semibold text-gray-800 block truncate">{selectedMember.email || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 uppercase block">Téléphone</span>
-                  <span className="font-semibold text-gray-800 block truncate">{selectedMember.phone || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 uppercase block">Département</span>
-                  <span className="font-semibold text-gray-800 block truncate">{selectedMember.department || '—'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 uppercase block">Urgence</span>
-                  <span className="font-semibold text-gray-800 block truncate">
-                    {[selectedMember.emergencyContactName, selectedMember.emergencyContactPhone].filter(Boolean).join(' ') || '—'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-end justify-between pt-2 border-t border-gray-100">
-                <div className="flex items-center gap-2">
-                  <div className="h-11 w-11 border border-gray-200 rounded p-0.5">
-                    {cardData.qrCode && <img src={cardData.qrCode} alt="QR" className="h-full w-full object-contain" />}
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-mono text-gray-500">{formatCardNumber(cardData.cardNumber)}</p>
-                    <p className="text-[8px] text-gray-400">{new Date(cardData.createdAt).toLocaleDateString('fr-FR')}</p>
-                  </div>
-                </div>
-                <span className="text-[8px] text-gray-400 italic">Created by Henock Aduma</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }
