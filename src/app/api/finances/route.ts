@@ -7,7 +7,9 @@ import { NextRequest } from 'next/server'
 async function getAuth(request: NextRequest) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  return await verifyAccessToken(token)
+  const payload = await verifyAccessToken(token)
+  if (!payload || !payload.churchId || !payload.userId) return null
+  return payload
 }
 
 const createTransactionSchema = z.object({
@@ -19,6 +21,10 @@ const createTransactionSchema = z.object({
   description: z.string().optional().nullable(),
   date: z.string().optional().nullable(),
   memberId: z.string().optional().nullable(),
+  recordedByName: z.string().optional().nullable(),
+  beneficiary: z.string().optional().nullable(),
+  referenceNumber: z.string().optional().nullable(),
+  signatureData: z.string().optional().nullable(),
 })
 
 const updateTransactionSchema = z.object({
@@ -30,13 +36,17 @@ const updateTransactionSchema = z.object({
   description: z.string().optional().nullable(),
   date: z.string().optional().nullable(),
   memberId: z.string().nullable().optional(),
+  recordedByName: z.string().optional().nullable(),
+  beneficiary: z.string().optional().nullable(),
+  referenceNumber: z.string().optional().nullable(),
+  signatureData: z.string().optional().nullable(),
 })
 
 // GET: List transactions with filters and totals
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAuth(request)
-    if (!auth) {
+    if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -126,7 +136,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await getAuth(request)
-    if (!auth) {
+    if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -144,6 +154,10 @@ export async function POST(request: NextRequest) {
         description: data.description || null,
         date: data.date ? new Date(data.date) : new Date(),
         memberId: data.memberId || null,
+        recordedByName: data.recordedByName || null,
+        beneficiary: data.beneficiary || null,
+        referenceNumber: data.referenceNumber || null,
+        signatureData: data.signatureData || null,
         createdBy: auth.userId,
       },
       include: { member: { select: { id: true, firstName: true, lastName: true } } },
@@ -171,7 +185,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const auth = await getAuth(request)
-    if (!auth) {
+    if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -201,6 +215,10 @@ export async function PUT(request: NextRequest) {
     if (data.description !== undefined) updateData.description = data.description
     if (data.date !== undefined) updateData.date = data.date ? new Date(data.date) : null
     if (data.memberId !== undefined) updateData.memberId = data.memberId
+    if (data.recordedByName !== undefined) updateData.recordedByName = data.recordedByName
+    if (data.beneficiary !== undefined) updateData.beneficiary = data.beneficiary
+    if (data.referenceNumber !== undefined) updateData.referenceNumber = data.referenceNumber
+    if (data.signatureData !== undefined) updateData.signatureData = data.signatureData
 
     const transaction = await db.transaction.update({
       where: { id },

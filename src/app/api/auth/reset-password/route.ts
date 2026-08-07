@@ -39,11 +39,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
     }
 
-    // Mettre à jour le mot de passe côté Supabase Auth (source d'identité)
-    await updateSupabasePassword(user.email, data.newPassword)
+    // Mettre à jour le mot de passe côté Supabase Auth (source d'identité si présent)
+    try {
+      await updateSupabasePassword(user.email, data.newPassword)
+    } catch (supErr) {
+      console.warn('Supabase password reset warning:', supErr)
+    }
 
-    // Sync du hash local (champ requis par le schéma, non utilisé pour le login)
-    const passwordHash = await bcrypt.hash(data.newPassword, 10)
+    // Sync du hash local
+    const passwordHash = await bcrypt.hash(data.newPassword, 12)
     await db.user.update({
       where: { id: user.id },
       data: { passwordHash },

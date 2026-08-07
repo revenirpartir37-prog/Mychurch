@@ -17,7 +17,9 @@ const bulkMessageSchema = z.object({
 async function getAuth(request: NextRequest) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  return await verifyAccessToken(token)
+  const payload = await verifyAccessToken(token)
+  if (!payload || !payload.churchId || !payload.userId) return null
+  return payload
 }
 
 // POST: Send bulk message to multiple members

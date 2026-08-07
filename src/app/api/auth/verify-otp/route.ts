@@ -71,9 +71,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Delete all OTPs for that email (cleanup)
+    // Delete all OTPs for that email EXCEPT a verified password_reset OTP (still needed by reset-password)
     await db.otp.deleteMany({
-      where: { email: data.email },
+      where: {
+        email: data.email,
+        OR: [
+          { purpose: { not: 'password_reset' } },
+          { verified: false },
+        ],
+      },
     })
 
     // If we have a user and church, generate JWT tokens for direct dashboard login

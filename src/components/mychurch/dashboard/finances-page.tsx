@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, TrendingUp, TrendingDown, DollarSign, Wallet, Building2, Banknote, Edit, Trash2, ArrowUpRight, ArrowDownRight, Wallet as WalletIcon, PieChart as PieChartIcon, BarChart3, Download } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, DollarSign, Wallet, Building2, Banknote, Edit, Trash2, ArrowUpRight, ArrowDownRight, Wallet as WalletIcon, PieChart as PieChartIcon, BarChart3, Download, FileText, Printer } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -24,6 +24,8 @@ import {
 import { EmptyState } from '@/components/mychurch/shared/empty-state'
 import { downloadCSV } from '@/lib/csv-utils'
 import { canCreateFinances, canEditFinances, canDeleteFinances } from '@/lib/frontend-rbac'
+import { generateFinancialPDF } from '@/lib/financial-pdf'
+import { SignaturePad } from '@/components/ui/signature-pad'
 
 interface Transaction {
   id: string
@@ -35,6 +37,10 @@ interface Transaction {
   description: string | null
   date: string
   memberId: string | null
+  recordedByName?: string | null
+  beneficiary?: string | null
+  referenceNumber?: string | null
+  signatureData?: string | null
 }
 
 export function FinancesPage() {
@@ -65,6 +71,10 @@ export function FinancesPage() {
     description: '',
     date: new Date().toISOString().split('T')[0],
     memberId: '',
+    recordedByName: '',
+    beneficiary: '',
+    referenceNumber: '',
+    signatureData: null as string | null,
   })
 
   const fetchData = useCallback(async () => {
@@ -151,6 +161,10 @@ export function FinancesPage() {
           ...form,
           amount: parseFloat(form.amount),
           memberId: form.memberId || null,
+          recordedByName: form.recordedByName || null,
+          beneficiary: form.beneficiary || null,
+          referenceNumber: form.referenceNumber || null,
+          signatureData: form.signatureData || null,
         }),
       })
       if (res.ok) {
@@ -160,6 +174,7 @@ export function FinancesPage() {
         setForm({
           type: 'revenue', category: '', amount: '', currency: 'USD',
           location: 'cash', description: '', date: new Date().toISOString().split('T')[0], memberId: '',
+          recordedByName: '', beneficiary: '', referenceNumber: '', signatureData: null,
         })
         fetchData()
       } else {
@@ -185,9 +200,14 @@ export function FinancesPage() {
 
   const openCreate = (type: 'revenue' | 'expense') => {
     setEditing(null)
+    const userFullName = [auth.firstName, auth.lastName].filter(Boolean).join(' ')
     setForm({
       type, category: '', amount: '', currency: 'USD',
       location: 'cash', description: '', date: new Date().toISOString().split('T')[0], memberId: '',
+      recordedByName: userFullName,
+      beneficiary: '',
+      referenceNumber: `REF-${Date.now().toString().slice(-6)}`,
+      signatureData: null,
     })
     setDialogOpen(true)
   }
@@ -203,6 +223,10 @@ export function FinancesPage() {
       description: t.description || '',
       date: t.date.split('T')[0],
       memberId: t.memberId || '',
+      recordedByName: t.recordedByName || [auth.firstName, auth.lastName].filter(Boolean).join(' '),
+      beneficiary: t.beneficiary || '',
+      referenceNumber: t.referenceNumber || '',
+      signatureData: t.signatureData || null,
     })
     setDialogOpen(true)
   }
@@ -846,6 +870,14 @@ export function FinancesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => generateFinancialPDF({
+                              ...t,
+                              type: t.type as 'revenue' | 'expense',
+                              churchName: auth.churchName || 'MYCHURCH',
+                              churchLogo: auth.churchLogo,
+                            })}>
+                              <FileText className="h-4 w-4 mr-2 text-primary" /> Imprimer PDF
+                            </DropdownMenuItem>
                             {canEditFinances(auth.role) && (
                               <DropdownMenuItem onClick={() => openEdit(t)}>
                                 <Edit className="h-4 w-4 mr-2" /> Modifier
@@ -870,7 +902,11 @@ export function FinancesPage() {
 
       {/* Transaction Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-lg max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{editing ? 'Modifier la transaction' : 'Nouvelle transaction'}</DialogTitle>
           </DialogHeader>
@@ -894,17 +930,29 @@ export function FinancesPage() {
                 </Button>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Catégorie *</Label>
-              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(categories).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>N° Pièce / Référence</Label>
+                <Input
+                  value={form.referenceNumber}
+                  onChange={(e) => setForm({ ...form, referenceNumber: e.target.value })}
+                  placeholder="EX: REF-1029"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Catégorie *</Label>
+                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(categories).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Montant *</Label>
@@ -923,6 +971,7 @@ export function FinancesPage() {
                 </Select>
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Lieu</Label>
@@ -940,8 +989,28 @@ export function FinancesPage() {
                   onChange={(e) => setForm({ ...form, date: e.target.value })} />
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Nom complet de l&apos;enregistreur</Label>
+                <Input
+                  value={form.recordedByName}
+                  onChange={(e) => setForm({ ...form, recordedByName: e.target.value })}
+                  placeholder="Prénom et Nom"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Bénéficiaire / Payeur</Label>
+                <Input
+                  value={form.beneficiary}
+                  onChange={(e) => setForm({ ...form, beneficiary: e.target.value })}
+                  placeholder="Nom du bénéficiaire"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label>Membre (optionnel)</Label>
+              <Label>Membre associé (optionnel)</Label>
               <Select value={form.memberId} onValueChange={(v) => setForm({ ...form, memberId: v })}>
                 <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
                 <SelectContent>
@@ -951,16 +1020,23 @@ export function FinancesPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>Description / Motif</Label>
               <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Description optionnelle" />
             </div>
+
+            {/* Signature Pad */}
+            <SignaturePad
+              value={form.signatureData}
+              onChange={(dataUrl) => setForm({ ...form, signatureData: dataUrl })}
+            />
           </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Annuler</Button></DialogClose>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
             <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Enregistrement...' : editing ? 'Modifier' : 'Ajouter'}
+              {submitting ? 'Enregistrement...' : editing ? 'Modifier' : 'Valider'}
             </Button>
           </DialogFooter>
         </DialogContent>

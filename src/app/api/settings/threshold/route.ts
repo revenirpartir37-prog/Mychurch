@@ -5,7 +5,9 @@ import { verifyAccessToken } from '@/lib/auth'
 async function getAuth(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  return verifyAccessToken(token)
+  const payload = await verifyAccessToken(token)
+  if (!payload || !payload.churchId || !payload.userId) return null
+  return payload
 }
 import { createAuditLog } from '@/lib/audit'
 import { z } from 'zod'

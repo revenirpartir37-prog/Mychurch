@@ -185,11 +185,11 @@ export default function JoinPage() {
       <div className="max-w-md mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 overflow-hidden">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white overflow-hidden shadow-lg ring-2 ring-white/30">
             {church.logo ? (
-              <Image src={church.logo} alt={church.name} width={48} height={48} className="object-contain" />
+              <Image src={church.logo} alt={church.name} width={64} height={64} className="object-contain p-1" />
             ) : (
-              <Image src="/logo-mychurch.png" alt="MYCHURCH" width={32} height={32} className="object-contain" />
+              <Image src="/logo-mychurch.png" alt="MYCHURCH" width={48} height={48} className="object-contain p-1" />
             )}
           </div>
           <div>

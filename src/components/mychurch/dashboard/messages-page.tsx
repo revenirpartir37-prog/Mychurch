@@ -67,6 +67,7 @@ interface MemberOption {
   firstName: string
   lastName: string
   photo?: string | null
+  role?: string | null
   department?: string | null
 }
 
@@ -198,12 +199,16 @@ export function MessagesPage() {
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch('/api/members?limit=999', {
+      // Recipients are app users (admin / treasurer / secretary / reader) in the same church,
+      // not church members/personnel.
+      const res = await fetch('/api/users-management?limit=999', {
         headers: { Authorization: `Bearer ${auth.token}` },
       })
       if (res.ok) {
         const data = await res.json()
-        setMembers(data.members || data.data || [])
+        const users = data.users || data.data || []
+        const current = users.filter((u: { id: string }) => u.id !== auth.userId)
+        setMembers(current)
       }
     } catch {
       // silent

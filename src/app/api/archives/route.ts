@@ -6,7 +6,9 @@ import { NextRequest } from 'next/server'
 async function getAuth(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  return verifyAccessToken(token)
+  const payload = await verifyAccessToken(token)
+  if (!payload || !payload.churchId || !payload.userId) return null
+  return payload
 }
 
 /** Returns the current month string (YYYY-MM) and year (YYYY) to block archiving the live period. */

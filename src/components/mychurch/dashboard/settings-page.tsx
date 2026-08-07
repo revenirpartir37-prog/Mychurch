@@ -525,31 +525,37 @@ export function SettingsPage() {
                   <p className="text-xs text-muted-foreground">
                     Affiché sur les cartes de membres et les rapports PDF
                   </p>
-                  <label className="inline-flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleLogoUpload}
-                      disabled={logoUploading}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5"
-                      disabled={logoUploading}
-                      asChild
-                    >
-                      <span>
-                        {logoUploading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Upload className="h-3.5 w-3.5" />
-                        )}
-                        {logoUploading ? 'Envoi...' : 'Changer le logo'}
-                      </span>
-                    </Button>
-                  </label>
+                  {auth.role === 'admin' ? (
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLogoUpload}
+                        disabled={logoUploading}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={logoUploading}
+                        asChild
+                      >
+                        <span>
+                          {logoUploading ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          {logoUploading ? 'Envoi...' : 'Changer le logo'}
+                        </span>
+                      </Button>
+                    </label>
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      Seul l&apos;administrateur peut modifier le logo
+                    </Badge>
+                  )}
                 </div>
               </div>
 

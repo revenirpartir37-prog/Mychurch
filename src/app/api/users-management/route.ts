@@ -36,8 +36,7 @@ const updateUserSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const auth = await getAuth(req)
-    if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-    if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
+    if (!auth || !auth.churchId || !auth.userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
     const page = Math.max(1, Number(searchParams.get('page') || 1))
@@ -91,7 +90,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const auth = await getAuth(req)
-    if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!auth || !auth.churchId || !auth.userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
 
     const body = await req.json()
@@ -107,6 +106,15 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(data.password, 12)
 
+    // Create user in Supabase Auth if possible
+    let firebaseUid: string | null = null
+    try {
+      const { createSupabaseUser } = await import('@/lib/supabase')
+      firebaseUid = await createSupabaseUser(data.email, data.password)
+    } catch {
+      // Non-blocking fallback
+    }
+
     const user = await db.user.create({
       data: {
         churchId: auth.churchId,
@@ -114,6 +122,7 @@ export async function POST(req: NextRequest) {
         lastName: data.lastName,
         email: data.email,
         passwordHash,
+        firebaseUid,
         role: data.role,
         phone: data.phone ?? null,
         function: data.function ?? null,
@@ -151,7 +160,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const auth = await getAuth(req)
-    if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!auth || !auth.churchId || !auth.userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
 
     const body = await req.json()
@@ -175,7 +184,15 @@ export async function PATCH(req: NextRequest) {
     if (data.phone !== undefined) updateData.phone = data.phone
     if (data.function !== undefined) updateData.function = data.function
     if (data.isActive !== undefined) updateData.isActive = data.isActive
-    if (data.password) updateData.passwordHash = await bcrypt.hash(data.password, 12)
+    if (data.password) {
+      updateData.passwordHash = await bcrypt.hash(data.password, 12)
+      try {
+        const { updateSupabasePassword } = await import('@/lib/supabase')
+        await updateSupabasePassword(existing.email, data.password)
+      } catch {
+        // Non-blocking
+      }
+    }
 
     const user = await db.user.update({
       where: { id: data.id },

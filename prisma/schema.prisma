@@ -109,6 +109,10 @@ model Transaction {
   date        DateTime @default(now())
   memberId    String?
   createdBy   String
+  recordedByName String?
+  beneficiary String?
+  referenceNumber String?
+  signatureData String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

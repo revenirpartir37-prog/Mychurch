@@ -1,4 +1,4 @@
-﻿import { verifyAccessToken } from '@/lib/auth'
+import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { z } from 'zod'
@@ -7,7 +7,9 @@ import { NextRequest } from 'next/server'
 async function getAuth(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return null
-  return verifyAccessToken(token)
+  const payload = await verifyAccessToken(token)
+  if (!payload || !payload.churchId || !payload.userId) return null
+  return payload
 }
 
 const createSchema = z.object({
