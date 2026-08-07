@@ -101,6 +101,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         auth: state.auth,
         theme: state.theme,
+        currentView: state.currentView,
       }),
     }
   )

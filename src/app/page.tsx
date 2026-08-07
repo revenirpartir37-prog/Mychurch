@@ -128,6 +128,13 @@ function DashboardView() {
 export default function Home() {
   const { currentView, auth, setCurrentView } = useAppStore()
 
+  // Restaure la session : si déjà authentifié et aucune vue active, aller au dashboard.
+  useEffect(() => {
+    if (auth.isAuthenticated && (currentView === 'landing' || currentView === 'login')) {
+      setCurrentView('dashboard')
+    }
+  }, [auth.isAuthenticated, currentView, setCurrentView])
+
   // Handle redirect from GeniusPay payment (reads ?view= and ?payment= params)
   useEffect(() => {
     if (typeof window === 'undefined') return

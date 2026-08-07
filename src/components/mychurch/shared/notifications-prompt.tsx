@@ -1,90 +1,59 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
-import { Bell, BellRing, X } from 'lucide-react'
+import { getOneSignal, requestPushPermission, isSubscribed } from '@/lib/onesignal-client'
+import { toast } from 'sonner'
+import { Bell, BellRing, X, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-// Charge le SDK OneSignal s'il n'est pas deja present, puis resout true quand pret.
-function ensureOneSignal(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined') return resolve(false)
-    if (window.OneSignal) return resolve(true)
-
-    const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
-    if (!appId) return resolve(false)
-
-    const script = document.createElement('script')
-    script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'
-    script.async = true
-    script.onload = () => {
-      if (window.OneSignal?.init) {
-        window.OneSignal.init({
-          appId,
-          notifyButton: { enable: true },
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerPath: '/OneSignalSDKWorker.js',
-          serviceWorkerParam: { scope: '/' },
-        })
-        resolve(true)
-      } else {
-        resolve(false)
-      }
-    }
-    script.onerror = () => resolve(false)
-    document.head.appendChild(script)
-  })
-}
-
-// Demande d'autorisation des notifications push a l'ouverture de l'application.
-// S'affiche a chaque ouverture tant que l'utilisateur n'a pas accepte
-// (abonnement OneSignal reel).
+// Demande d'autorisation des notifications push à la première connexion / inscription.
+// S'affiche à chaque ouverture tant que l'utilisateur n'a pas accepté (abonnement actif).
 export function NotificationsPrompt() {
   const isAuthenticated = useAppStore((s) => s.auth.isAuthenticated)
   const [visible, setVisible] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  const checkSubscription = useCallback(async () => {
+    const subscribed = await isSubscribed()
+    setChecking(false)
+    setVisible(!subscribed)
+  }, [])
 
   useEffect(() => {
-    if (!isAuthenticated) return
-
-    let mounted = true
-    // On affiche immediatement le message a chaque ouverture.
-    if (mounted) setVisible(true)
-
-    // Puis on verifie l'abonnement reel : si deja abonne, on le masque.
-    void (async () => {
-      const ok = await ensureOneSignal()
-      if (!ok || !mounted) return
-      try {
-        const id = await window.OneSignal?.User?.getOnesignalId?.()
-        if (id && mounted) setVisible(false)
-      } catch {
-        // garder visible
-      }
-    })()
-
-    return () => {
-      mounted = false
+    if (!isAuthenticated) {
+      setVisible(false)
+      setChecking(true)
+      return
     }
-  }, [isAuthenticated])
+    // Préchauffe le SDK puis vérifie l'abonnement réel.
+    void getOneSignal()
+    const t = setTimeout(() => void checkSubscription(), 1500)
+    return () => clearTimeout(t)
+  }, [isAuthenticated, checkSubscription])
 
   async function handleAllow() {
-    const ok = await ensureOneSignal()
-    if (ok && window.OneSignal?.Notifications) {
-      try {
-        await window.OneSignal.Notifications.requestPermission()
-      } catch {
-        // utilisateur a pu refuser la permission navigateur
+    try {
+      await requestPushPermission()
+      // Confirme l'état après le geste utilisateur.
+      const subscribed = await isSubscribed()
+      if (subscribed) {
+        toast.success('Notifications activées. Bienvenue sur MYCHURCH !')
+      } else {
+        toast.info('Vous pourrez activer les notifications à tout moment.')
       }
+      setVisible(false)
+    } catch {
+      setVisible(false)
     }
-    // Masque pour cette session ; reviendra a la prochaine ouverture.
-    setVisible(false)
   }
 
   function handleDismiss() {
     setVisible(false)
   }
 
-  if (!visible) return null
+  // Ne rien rendre tant qu'on n'a pas vérifié (évite flash), ni si connecté.
+  if (checking || !isAuthenticated || !visible) return null
 
   return (
     <div className="fixed bottom-4 right-4 z-[60] max-w-sm animate-[fadeInUp_0.4s_ease-out]">
@@ -103,13 +72,13 @@ export function NotificationsPrompt() {
           <div>
             <p className="text-sm font-semibold">Activer les notifications</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Recevez en temps reel les nouvelles : approbations, messages et rappels
-              d&apos;evenements.
+              Pour votre première connexion : recevez en temps réel approbations, messages et
+              rappels d&apos;événements.
             </p>
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={handleAllow} className="gap-1.5">
-                <BellRing className="h-3.5 w-3.5" />
-                Oui, activer
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Activer maintenant
               </Button>
               <Button size="sm" variant="ghost" onClick={handleDismiss}>
                 Plus tard
