@@ -60,6 +60,9 @@ start-dev.sh
 Caddyfile
 mini-services/
 
+# demo / example code (not part of the app)
+examples/
+
 # QA / screenshots
 download/
 
