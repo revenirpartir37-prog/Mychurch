@@ -198,6 +198,8 @@ export function MemberCardsPage() {
     return num
   }
 
+  const [activeTab, setActiveTab] = useState<'generate' | 'list'>('generate')
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -210,7 +212,29 @@ export function MemberCardsPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      {/* Tabs Navigation */}
+      <div className="flex border-b border-border gap-2">
+        <Button
+          variant={activeTab === 'generate' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('generate')}
+          className="rounded-b-none border-b-2 border-transparent data-[active=true]:border-primary"
+        >
+          <CreditCard className="h-4 w-4 mr-2" /> Générer une carte
+        </Button>
+        <Button
+          variant={activeTab === 'list' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('list')}
+          className="rounded-b-none border-b-2 border-transparent data-[active=true]:border-primary"
+        >
+          <Printer className="h-4 w-4 mr-2" /> Afficher les cartes générées
+          {existingCards.length > 0 && (
+            <Badge variant="secondary" className="ml-2 text-xs">{existingCards.length}</Badge>
+          )}
+        </Button>
+      </div>
+
+      {activeTab === 'generate' ? (
+        <div className="grid lg:grid-cols-2 gap-6">
         {/* Left: Selection & Generation */}
         <div className="space-y-4">
           {/* Member Selector */}
@@ -546,53 +570,75 @@ export function MemberCardsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      {/* Cartes existantes */}
-      <div className="space-y-4 pt-4 border-t">
-        <h2 className="font-semibold text-lg">Cartes déjà générées</h2>
-        {cardsLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
+        </div>
+      ) : (
+        /* TAB 2: Cartes déjà générées */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-lg">Toutes les cartes générées ({existingCards.length})</h2>
+            <Button size="sm" onClick={() => setActiveTab('generate')}>
+              <CreditCard className="h-4 w-4 mr-1.5" /> Générer une nouvelle carte
+            </Button>
           </div>
-        ) : existingCards.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Aucune carte générée pour le moment.</p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {existingCards.map((card) => (
-              <Card key={card.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4 flex items-center justify-between gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    {card.member?.photo ? (
-                      <img src={card.member.photo} alt="Photo" className="h-full w-full object-cover rounded-lg" />
-                    ) : (
-                      <CreditCard className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">
-                      {card.member
-                        ? `${card.member.firstName} ${card.member.lastName}`
-                        : 'Membre'}
-                    </p>
-                    <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                      {formatCardNumber(card.cardNumber)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(card.createdAt).toLocaleDateString('fr-FR')}
-                    </p>
-                  </div>
-                  <Badge variant={card.isPaid ? 'default' : 'outline'}>
-                    {card.isPaid ? 'Fait' : 'Non fait'}
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+          {cardsLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Skeleton className="h-28" />
+              <Skeleton className="h-28" />
+              <Skeleton className="h-28" />
+            </div>
+          ) : existingCards.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed rounded-xl space-y-3">
+              <CreditCard className="h-12 w-12 mx-auto text-muted-foreground/40" />
+              <p className="text-sm font-medium text-muted-foreground">Aucune carte générée pour le moment.</p>
+              <Button size="sm" variant="outline" onClick={() => setActiveTab('generate')}>
+                Générer la première carte
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {existingCards.map((card) => (
+                <Card
+                  key={card.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => {
+                    if (card.member) {
+                      setSelectedMemberId(card.member.id)
+                      setCardData(card)
+                      setActiveTab('generate')
+                    }
+                  }}
+                >
+                  <CardContent className="p-4 flex items-center justify-between gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      {card.member?.photo ? (
+                        <img src={card.member.photo} alt="Photo" className="h-full w-full object-cover rounded-lg" />
+                      ) : (
+                        <CreditCard className="h-5 w-5" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {card.member
+                          ? `${card.member.firstName} ${card.member.lastName}`
+                          : 'Membre'}
+                      </p>
+                      <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                        {formatCardNumber(card.cardNumber)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(card.createdAt).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <Badge variant={card.isPaid ? 'default' : 'outline'}>
+                      {card.isPaid ? 'Fait' : 'Non fait'}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* AREA PRINTABLE DEDICATED TO WINDOW.PRINT() */}
       {cardData && selectedMember && (

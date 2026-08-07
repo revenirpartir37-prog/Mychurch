@@ -51,6 +51,7 @@ export default function JoinPage() {
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [done, setDone] = useState(false)
+  const [cardFlipped, setCardFlipped] = useState(false)
 
   useEffect(() => {
     async function fetchChurch() {
@@ -185,12 +186,13 @@ export default function JoinPage() {
       <div className="max-w-md mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white overflow-hidden shadow-lg ring-2 ring-white/30">
-            {church.logo ? (
-              <Image src={church.logo} alt={church.name} width={64} height={64} className="object-contain p-1" />
-            ) : (
-              <Image src="/logo-mychurch.png" alt="MYCHURCH" width={48} height={48} className="object-contain p-1" />
-            )}
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white overflow-hidden shadow-lg ring-2 ring-white/30 shrink-0">
+            <img
+              src={church.logo || '/logo-mychurch.png'}
+              alt={church.name}
+              className="h-full w-full object-contain p-1"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/logo-mychurch.png' }}
+            />
           </div>
           <div>
             <h1 className="text-xl font-bold">{church.name}</h1>
@@ -198,31 +200,124 @@ export default function JoinPage() {
           </div>
         </div>
 
-        {/* Card preview */}
-        <div className="rounded-2xl bg-gradient-to-br from-blue-600 via-blue-800 to-blue-950 p-5 mb-6 aspect-[1.586/1] flex flex-col justify-between overflow-hidden relative">
-          <div className="absolute inset-0 opacity-[0.05]" style={{
-            backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.5) 8px, rgba(255,255,255,0.5) 9px)`,
-          }} />
-          <div className="relative z-10 flex flex-col items-center gap-1.5">
-            <img src={church.logo || '/logo-mychurch.png'} alt="" className="w-8 h-8 object-contain brightness-0 invert" />
-            <span className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/90">{church.name}</span>
-          </div>
-          <div className="relative z-10 flex flex-col items-center gap-2">
-            <div className="h-16 w-16 rounded-full border-[3px] border-white/30 overflow-hidden bg-white/15">
-              {preview.photo ? (
-                <img src={preview.photo} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center text-lg font-bold text-white/80">
-                  {preview.firstName[0] || ''}{preview.lastName[0] || ''}
+        {/* 3D Recto / Verso Card preview */}
+        <div className="mb-6">
+          <div
+            className="relative cursor-pointer"
+            style={{ perspective: '1000px' }}
+            onClick={() => setCardFlipped(!cardFlipped)}
+          >
+            <div
+              className="relative aspect-[1.586/1] w-full"
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: cardFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              {/* RECTO */}
+              <div
+                className="w-full h-full rounded-2xl overflow-hidden shadow-xl border border-white/20 absolute inset-0"
+                style={{ backfaceVisibility: 'hidden' }}
+              >
+                <div className="relative h-full bg-gradient-to-br from-blue-600 via-blue-800 to-blue-950 p-5 text-white flex flex-col justify-between">
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <img
+                      src={church.logo || '/logo-mychurch.png'}
+                      alt=""
+                      className="w-8 h-8 object-contain drop-shadow"
+                      onError={(e) => { (e.target as HTMLImageElement).src = '/logo-mychurch.png' }}
+                    />
+                    <span className="text-[10px] font-bold tracking-[0.25em] uppercase text-white/90">
+                      {church.name}
+                    </span>
+                  </div>
+
+                  <div className="relative z-10 flex flex-col items-center gap-2">
+                    <div className="h-16 w-16 rounded-full border-[3px] border-white/40 overflow-hidden bg-white/15 flex items-center justify-center shadow-md">
+                      {preview.photo ? (
+                        <img src={preview.photo} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-lg font-bold text-white/90">
+                          {preview.firstName[0] || ''}{preview.lastName[0] || ''}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-base font-bold tracking-wide text-center leading-tight">
+                      {preview.firstName} {preview.lastName}
+                    </p>
+                    <p className="text-[10px] font-mono tracking-[0.15em] text-white/60 uppercase">
+                      MC-Nouveau Membre
+                    </p>
+                  </div>
+
+                  <div className="relative z-10 text-center">
+                    <p className="text-[9px] font-bold tracking-[0.3em] text-white/40 uppercase">
+                      MEMBER CARD • RECTO
+                    </p>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* VERSO */}
+              <div
+                className="w-full h-full rounded-2xl overflow-hidden shadow-xl border border-gray-200 absolute inset-0 bg-white text-gray-900"
+                style={{
+                  backfaceVisibility: 'hidden',
+                  transform: 'rotateY(180deg)',
+                }}
+              >
+                <div className="relative h-full flex flex-col justify-between p-5">
+                  <div className="absolute top-0 left-0 right-0 h-10 bg-gray-900" />
+
+                  <div className="mt-8 flex items-center gap-2.5">
+                    <img
+                      src={church.logo || '/logo-mychurch.png'}
+                      alt=""
+                      className="h-7 w-7 object-contain rounded"
+                      onError={(e) => { (e.target as HTMLImageElement).src = '/logo-mychurch.png' }}
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">{church.name}</p>
+                      <p className="text-[9px] text-gray-500">Carte officielle du membre</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9px] my-1">
+                    <div>
+                      <span className="text-gray-400 block uppercase">Téléphone</span>
+                      <span className="font-medium text-gray-800 truncate block">{preview.phone || 'Non renseigné'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block uppercase">Email</span>
+                      <span className="font-medium text-gray-800 truncate block">{preview.email || 'Non renseigné'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block uppercase">Département</span>
+                      <span className="font-medium text-gray-800 truncate block">{preview.department || 'Membre'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block uppercase">Statut</span>
+                      <span className="font-medium text-emerald-600 truncate block">En attente de validation</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between pt-1 border-t border-gray-100">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-8 w-8 rounded border border-gray-200 bg-gray-50 flex items-center justify-center">
+                        <CreditCard className="h-4 w-4 text-gray-400" />
+                      </div>
+                      <span className="text-[8px] font-mono text-gray-400">QR Code au retrait</span>
+                    </div>
+                    <span className="text-[8px] text-gray-400 italic">MYCHURCH App</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <p className="text-lg font-bold">{preview.firstName}</p>
-              <p className="text-lg font-bold">{preview.lastName}</p>
-            </div>
-            <p className="text-[10px] font-mono tracking-[0.2em] text-white/60 uppercase">Aperçu</p>
           </div>
+          <p className="text-center text-xs text-white/70 mt-2">
+            💡 Cliquez sur la carte pour voir le <strong>{cardFlipped ? 'Recto' : 'Verso'}</strong>
+          </p>
         </div>
 
         {/* Form */}

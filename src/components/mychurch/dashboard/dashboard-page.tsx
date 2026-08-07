@@ -151,11 +151,28 @@ export function DashboardPage() {
       const token = auth.token
       const headers = { 'Authorization': `Bearer ${token}` }
 
-      const [membersRes, financeRes, eventsRes, attendanceRes] = await Promise.allSettled([
+      const [
+        membersRes,
+        financeRes,
+        eventsRes,
+        attendanceRes,
+        transRes,
+        membersListRes,
+        auditRes,
+        upcomingRes,
+        debtsRes,
+      ] = await Promise.allSettled([
         fetch('/api/members?limit=1', { headers }).then(r => r.json()),
         fetch('/api/finances?limit=1', { headers }).then(r => r.json()),
         fetch('/api/events?limit=1', { headers }).then(r => r.json()),
         fetch('/api/attendance?limit=1', { headers }).then(r => r.json()),
+        fetch('/api/finances?limit=5', { headers }).then(r => r.json()),
+        fetch('/api/members?limit=5&sort=desc', { headers }).then(r => r.json()),
+        fetch('/api/audit-logs?limit=8', { headers }).then(r => r.json()),
+        fetch('/api/events?limit=5', { headers }).then(r => r.json()),
+        auth.role === 'admin'
+          ? fetch('/api/debts?status=pending&limit=5', { headers }).then(r => r.json())
+          : Promise.resolve(null),
       ])
 
       const membersData = membersRes.status === 'fulfilled' ? membersRes.value : null
@@ -176,60 +193,33 @@ export function DashboardPage() {
         monthlyAttendance: attendanceTotal,
       })
 
-      // Load recent transactions
-      const transRes = await fetch('/api/finances?limit=5', { headers })
-      if (transRes.ok) {
-        const transData = await transRes.json()
-        setRecentTransactions(transData.transactions ?? transData.data ?? [])
+      if (transRes.status === 'fulfilled' && transRes.value) {
+        setRecentTransactions(transRes.value.transactions ?? transRes.value.data ?? [])
       }
 
-      // Load recent members
-      const membersListRes = await fetch('/api/members?limit=5&sort=desc', { headers })
-      if (membersListRes.ok) {
-        const membersListData = await membersListRes.json()
-        setRecentMembers(membersListData.members ?? membersListData.data ?? [])
+      if (membersListRes.status === 'fulfilled' && membersListRes.value) {
+        setRecentMembers(membersListRes.value.members ?? membersListRes.value.data ?? [])
       }
 
-      // Load recent audit logs for activity timeline
-      const auditRes = await fetch('/api/audit-logs?limit=8', { headers })
-      if (auditRes.ok) {
-        const auditData = await auditRes.json()
-        setAuditLogs(auditData.logs ?? [])
+      if (auditRes.status === 'fulfilled' && auditRes.value) {
+        setAuditLogs(auditRes.value.logs ?? [])
       }
 
-      // Load upcoming events for the widget
-      try {
-        const upcomingRes = await fetch('/api/events?limit=5', { headers })
-        if (upcomingRes.ok) {
-          const upcomingData = await upcomingRes.json()
-          const allEvents: UpcomingEvent[] = (upcomingData.events ?? []).map((e: any) => ({
-            id: e.id,
-            title: e.title,
-            type: e.type,
-            startDate: e.startDate,
-            location: e.location,
-          }))
-          const now = new Date()
-          const futureEvents = allEvents.filter(e => new Date(e.startDate) > now)
-          setUpcomingEvents(futureEvents)
-        }
-      } catch {
-        // silent
+      if (upcomingRes.status === 'fulfilled' && upcomingRes.value) {
+        const allEvents: UpcomingEvent[] = (upcomingRes.value.events ?? []).map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          type: e.type,
+          startDate: e.startDate,
+          location: e.location,
+        }))
+        const now = new Date()
+        const futureEvents = allEvents.filter(e => new Date(e.startDate) > now)
+        setUpcomingEvents(futureEvents)
       }
 
-      if (auth.role === 'admin') {
-        setPendingDebtsLoading(true)
-        try {
-          const debtsRes = await fetch('/api/debts?status=pending&limit=10', { headers })
-          if (debtsRes.ok) {
-            const debtsData = await debtsRes.json()
-            setPendingDebts(debtsData.debts ?? [])
-          }
-        } catch (e) {
-          console.error('Pending debts load error:', e)
-        } finally {
-          setPendingDebtsLoading(false)
-        }
+      if (debtsRes.status === 'fulfilled' && debtsRes.value) {
+        setPendingDebts(debtsRes.value.debts ?? [])
       }
     } catch (err) {
       console.error('Dashboard load error:', err)

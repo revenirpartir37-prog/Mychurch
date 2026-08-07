@@ -143,6 +143,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = createTransactionSchema.parse(body)
 
+    // Generate sequential reference number if missing (REF-000001 format)
+    let refNum = data.referenceNumber
+    if (!refNum || refNum.startsWith('AUTO') || refNum.startsWith('REF-')) {
+      const count = await db.transaction.count({ where: { churchId: auth.churchId } })
+      refNum = `REF-${String(count + 1).padStart(6, '0')}`
+    }
+
     const transaction = await db.transaction.create({
       data: {
         churchId: auth.churchId,
@@ -156,7 +163,7 @@ export async function POST(request: NextRequest) {
         memberId: data.memberId || null,
         recordedByName: data.recordedByName || null,
         beneficiary: data.beneficiary || null,
-        referenceNumber: data.referenceNumber || null,
+        referenceNumber: refNum,
         signatureData: data.signatureData || null,
         createdBy: auth.userId,
       },

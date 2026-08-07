@@ -163,27 +163,15 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
     if (!member) return
     setLoading(true)
     try {
-      const [attRes, txRes] = await Promise.all([
-        fetch(`/api/attendance?memberId=${member.id}&limit=10`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-        fetch(`/api/finances?memberId=${member.id}&limit=10`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-      ])
+      const attRes = await fetch(`/api/attendance?memberId=${member.id}&limit=10`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
 
       if (attRes.ok) {
         const attData = await attRes.json()
         setAttendance(attData.records || [])
       } else {
         setAttendance([])
-      }
-
-      if (txRes.ok) {
-        const txData = await txRes.json()
-        setTransactions(txData.transactions || [])
-      } else {
-        setTransactions([])
       }
     } catch {
       toast.error('Erreur de connexion')
@@ -197,7 +185,6 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
       fetchData()
     } else {
       setAttendance([])
-      setTransactions([])
     }
   }, [open, member, fetchData])
 
@@ -341,68 +328,6 @@ export function MemberDetailDrawer({ open, onOpenChange, member, token }: Member
                         </p>
                       </div>
                       <AttendanceStatusBadge status={record.status} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* ─── Historique des transactions ─── */}
-            <div className="px-5 py-4 pb-8">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Wallet className="h-3.5 w-3.5" />
-                Historique des transactions
-              </h3>
-
-              {loading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-4 w-24 flex-1" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                  ))}
-                </div>
-              ) : transactions.length === 0 ? (
-                <EmptyState
-                  icon={Wallet}
-                  title="Aucune transaction"
-                  description="Les transactions de ce membre apparaîtront ici"
-                  className="py-6"
-                />
-              ) : (
-                <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {transactions.map((tx) => (
-                    <div
-                      key={tx.id}
-                      className="flex items-center justify-between gap-3 py-2 px-2 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {getCategoryLabel(tx.category, tx.type)}
-                        </p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Clock className="h-3 w-3" />
-                          {format(new Date(tx.date), 'dd MMM yyyy', { locale: fr })}
-                        </p>
-                      </div>
-                      <span
-                        className={`text-sm font-semibold whitespace-nowrap ${
-                          tx.type === 'revenue'
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-rose-600 dark:text-rose-400'
-                        }`}
-                      >
-                        {tx.type === 'revenue' ? '+' : '-'}
-                        {tx.amount.toLocaleString('fr-FR', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{' '}
-                        {tx.currency}
-                      </span>
                     </div>
                   ))}
                 </div>

@@ -908,40 +908,49 @@ export function FinancesPage() {
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
           <DialogHeader>
-            <DialogTitle>{editing ? 'Modifier la transaction' : 'Nouvelle transaction'}</DialogTitle>
+            <DialogTitle className={form.type === 'revenue' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+              {editing
+                ? `Modifier la transaction (${form.type === 'revenue' ? 'Compte-rendu' : 'Dépense'})`
+                : form.type === 'revenue'
+                ? 'Nouveau Compte-rendu / Recette'
+                : 'Nouvelle Dépense / Bon de sortie'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label className="text-xs text-muted-foreground uppercase font-semibold">Type de transaction</Label>
               <div className="flex gap-2">
                 <Button
                   variant={form.type === 'revenue' ? 'default' : 'outline'}
-                  className="flex-1"
+                  className={`flex-1 ${form.type === 'revenue' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
                   onClick={() => setForm({ ...form, type: 'revenue', category: '' })}
                 >
-                  <ArrowUpRight className="h-4 w-4 mr-1" /> Compte rendu
+                  <ArrowUpRight className="h-4 w-4 mr-1" /> Compte rendu (Recette)
                 </Button>
                 <Button
                   variant={form.type === 'expense' ? 'destructive' : 'outline'}
                   className="flex-1"
                   onClick={() => setForm({ ...form, type: 'expense', category: '' })}
                 >
-                  <ArrowDownRight className="h-4 w-4 mr-1" /> Dépense
+                  <ArrowDownRight className="h-4 w-4 mr-1" /> Dépense (Sortie)
                 </Button>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>N° Pièce / Référence</Label>
+                <Label className="text-xs">N° Référence (Automatique)</Label>
                 <Input
-                  value={form.referenceNumber}
-                  onChange={(e) => setForm({ ...form, referenceNumber: e.target.value })}
-                  placeholder="EX: REF-1029"
+                  value={form.referenceNumber || 'Génération automatique (REF-000001)'}
+                  readOnly
+                  disabled
+                  className="bg-muted font-mono text-xs cursor-not-allowed opacity-80"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Catégorie *</Label>
+                <Label className="text-xs">
+                  {form.type === 'revenue' ? 'Catégorie de Recette *' : 'Catégorie de Dépense *'}
+                </Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
@@ -955,12 +964,14 @@ export function FinancesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Montant *</Label>
+                <Label className="text-xs">
+                  {form.type === 'revenue' ? 'Montant Recouvré *' : 'Montant Déboursé *'}
+                </Label>
                 <Input type="number" step="0.01" value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0.00" />
               </div>
               <div className="space-y-2">
-                <Label>Devise</Label>
+                <Label className="text-xs">Devise</Label>
                 <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v as Currency })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -974,17 +985,19 @@ export function FinancesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Lieu</Label>
+                <Label className="text-xs">
+                  {form.type === 'revenue' ? 'Lieu d\'Encaissement' : 'Lieu de Décaissement'}
+                </Label>
                 <Select value={form.location} onValueChange={(v) => setForm({ ...form, location: v as TransactionLocation })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cash">Caisse</SelectItem>
-                    <SelectItem value="bank">Banque</SelectItem>
+                    <SelectItem value="cash">Caisse Physique</SelectItem>
+                    <SelectItem value="bank">Compte Bancaire</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Date *</Label>
+                <Label className="text-xs">Date de Transaction *</Label>
                 <Input type="date" value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })} />
               </div>
@@ -992,25 +1005,27 @@ export function FinancesPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Nom complet de l&apos;enregistreur</Label>
+                <Label className="text-xs">Enregistré par (Responsable)</Label>
                 <Input
                   value={form.recordedByName}
                   onChange={(e) => setForm({ ...form, recordedByName: e.target.value })}
-                  placeholder="Prénom et Nom"
+                  placeholder="Prénom et Nom de l'enregistreur"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Bénéficiaire / Payeur</Label>
+                <Label className="text-xs">
+                  {form.type === 'revenue' ? 'Provenance / Déposant' : 'Bénéficiaire / Destinataire'}
+                </Label>
                 <Input
                   value={form.beneficiary}
                   onChange={(e) => setForm({ ...form, beneficiary: e.target.value })}
-                  placeholder="Nom du bénéficiaire"
+                  placeholder={form.type === 'revenue' ? 'Nom du donateur / provenance' : 'Nom du bénéficiaire payé'}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Membre associé (optionnel)</Label>
+              <Label className="text-xs">Membre concerné (optionnel)</Label>
               <Select value={form.memberId} onValueChange={(v) => setForm({ ...form, memberId: v })}>
                 <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
                 <SelectContent>
@@ -1022,9 +1037,14 @@ export function FinancesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Description / Motif</Label>
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Description optionnelle" />
+              <Label className="text-xs">
+                {form.type === 'revenue' ? 'Motif du Compte-rendu' : 'Motif / Justification de la Dépense'}
+              </Label>
+              <Input
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder={form.type === 'revenue' ? 'ex: Compte rendu du culte d\'action de grâce' : 'ex: Achat de matériel de sonorisation'}
+              />
             </div>
 
             {/* Signature Pad */}
@@ -1035,7 +1055,7 @@ export function FinancesPage() {
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
+            <Button onClick={handleSubmit} disabled={submitting} className={form.type === 'revenue' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}>
               {submitting ? 'Enregistrement...' : editing ? 'Modifier' : 'Valider'}
             </Button>
           </DialogFooter>
