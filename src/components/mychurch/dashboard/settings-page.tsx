@@ -357,38 +357,40 @@ export function SettingsPage() {
       <Separator />
 
       <Tabs defaultValue="profil" className="space-y-6">
-        <TabsList className={`grid w-full ${auth.role === 'admin' ? 'grid-cols-7' : 'grid-cols-6'}`}>
-          <TabsTrigger value="profil" className="gap-1.5 text-xs sm:text-sm">
-            <User className="h-4 w-4 hidden sm:inline-block" />
-            Profil
-          </TabsTrigger>
-          <TabsTrigger value="eglise" className="gap-1.5 text-xs sm:text-sm">
-            <Building2 className="h-4 w-4 hidden sm:inline-block" />
-            Église
-          </TabsTrigger>
-          <TabsTrigger value="abonnement" className="gap-1.5 text-xs sm:text-sm">
-            <CreditCard className="h-4 w-4 hidden sm:inline-block" />
-            Abonnement
-          </TabsTrigger>
-          <TabsTrigger value="theme" className="gap-1.5 text-xs sm:text-sm">
-            <Palette className="h-4 w-4 hidden sm:inline-block" />
-            Thème
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="gap-1.5 text-xs sm:text-sm">
-            <Shield className="h-4 w-4 hidden sm:inline-block" />
-            Journal d'audit
-          </TabsTrigger>
-          {auth.role === 'admin' && (
-            <TabsTrigger value="admin" className="gap-1.5 text-xs sm:text-sm">
-              <Crown className="h-4 w-4 hidden sm:inline-block" />
-              Administration
+        <div className="w-full overflow-x-auto pb-1 -mx-1 px-1 sm:overflow-visible sm:pb-0 sm:mx-0 sm:px-0">
+          <TabsList className={`grid w-max grid-flow-col auto-cols-fr sm:w-full ${auth.role === 'admin' ? 'sm:grid-cols-7' : 'sm:grid-cols-6'} sm:grid-flow-row`}>
+            <TabsTrigger value="profil" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+              <User className="h-4 w-4" />
+              Profil
             </TabsTrigger>
-          )}
-          <TabsTrigger value="apropos" className="gap-1.5 text-xs sm:text-sm">
-            <Info className="h-4 w-4 hidden sm:inline-block" />
-            À propos
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="eglise" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+              <Building2 className="h-4 w-4" />
+              Église
+            </TabsTrigger>
+            <TabsTrigger value="abonnement" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+              <CreditCard className="h-4 w-4" />
+              Abonnement
+            </TabsTrigger>
+            <TabsTrigger value="theme" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+              <Palette className="h-4 w-4" />
+              Thème
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+              <Shield className="h-4 w-4" />
+              Journal d'audit
+            </TabsTrigger>
+            {auth.role === 'admin' && (
+              <TabsTrigger value="admin" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+                <Crown className="h-4 w-4" />
+                Administration
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="apropos" className="gap-1.5 text-xs sm:text-sm min-w-[7.5rem] sm:min-w-0">
+              <Info className="h-4 w-4" />
+              À propos
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ==================== PROFIL TAB ==================== */}
         <TabsContent value="profil" className="space-y-4">

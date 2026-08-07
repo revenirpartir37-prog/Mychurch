@@ -396,6 +396,7 @@ export function UsersManagementPage() {
               <p className="text-sm">Aucun utilisateur trouvé</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -478,6 +479,7 @@ export function UsersManagementPage() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
