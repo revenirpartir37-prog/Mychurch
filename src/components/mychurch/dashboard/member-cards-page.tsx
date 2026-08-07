@@ -47,6 +47,8 @@ interface CardData {
   member: Member
 }
 
+interface ExistingCard extends CardData {}
+
 export function MemberCardsPage() {
   const { auth } = useAppStore()
   const [members, setMembers] = useState<Member[]>([])
@@ -56,6 +58,8 @@ export function MemberCardsPage() {
   const [loading, setLoading] = useState(true)
   const [isFlipped, setIsFlipped] = useState(false)
   const [isFlipping, setIsFlipping] = useState(false)
+  const [existingCards, setExistingCards] = useState<ExistingCard[]>([])
+  const [cardsLoading, setCardsLoading] = useState(true)
 
   const selectedMember = useMemo(
     () => members.find((m) => m.id === selectedMemberId),
@@ -88,6 +92,26 @@ export function MemberCardsPage() {
     }
     fetchMembers()
   }, [auth.token])
+
+  useEffect(() => {
+    async function fetchExistingCards() {
+      setCardsLoading(true)
+      try {
+        const res = await fetch('/api/cards?limit=50', {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setExistingCards(data.cards || data.data || [])
+        }
+      } catch {
+        // silent
+      } finally {
+        setCardsLoading(false)
+      }
+    }
+    fetchExistingCards()
+  }, [auth.token, cardData])
 
   function handleMemberChange(memberId: string) {
     setSelectedMemberId(memberId)
@@ -124,6 +148,12 @@ export function MemberCardsPage() {
 
   function handlePrint() {
     window.print()
+  }
+
+  function handleDownload() {
+    // Print with the card visible is the most reliable cross-platform way;
+    // this triggers the print/save dialog on mobile & desktop.
+    handlePrint()
   }
 
   function handleShare() {
@@ -244,7 +274,7 @@ export function MemberCardsPage() {
                 <Button
                   variant="outline"
                   className="flex-1 gap-2"
-                  disabled
+                  onClick={handleDownload}
                 >
                   <Download className="h-4 w-4" />
                   Télécharger
@@ -497,6 +527,79 @@ export function MemberCardsPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* ─── Cartes déjà générées ─── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-primary" />
+            Cartes déjà générées
+            {existingCards.length > 0 && (
+              <Badge variant="secondary" className="text-xs">{existingCards.length}</Badge>
+            )}
+          </h2>
+        </div>
+
+        {cardsLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        ) : existingCards.length === 0 ? (
+          <Card>
+            <CardContent className="py-6 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <CreditCard className="h-10 w-10 opacity-30" />
+              <p className="text-sm">Aucune carte générée pour le moment</p>
+              <p className="text-xs">Générez une carte ci-dessus pour la voir apparaître ici</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {existingCards.map((card) => (
+              <Card
+                key={card.id}
+                className="cursor-pointer transition-shadow hover:shadow-md"
+                onClick={() => {
+                  const member = members.find((m) => m.id === card.member?.id)
+                  if (member) {
+                    setSelectedMemberId(member.id)
+                    setCardData(card)
+                    setIsFlipped(false)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }
+                }}
+              >
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-lg border-2 border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                    {card.qrCode ? (
+                      <img src={card.qrCode} alt="QR" className="h-full w-full object-contain" />
+                    ) : (
+                      <QrCode className="h-6 w-6 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">
+                      {card.member
+                        ? `${card.member.firstName} ${card.member.lastName}`
+                        : 'Membre'}
+                    </p>
+                    <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                      {formatCardNumber(card.cardNumber)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(card.createdAt).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                  <Badge variant={card.isPaid ? 'default' : 'outline'}>
+                    {card.isPaid ? 'Payée' : 'Non payée'}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       </div>

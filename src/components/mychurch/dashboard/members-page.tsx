@@ -29,7 +29,7 @@ import {
   Plus, Search, Filter, Edit, Trash2, Eye, Camera, Upload, UserPlus, X, MoreHorizontal,
   ChevronLeft, ChevronRight, Building2, Download, ChevronDown, ChevronUp,
   FileSpreadsheet, UserCheck, UserX, FileDown,
-  Users, CheckSquare, Square, ArrowLeftRight,
+  Users, CheckSquare, Square, ArrowLeftRight, Link2,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
@@ -155,6 +155,11 @@ export function MembersPage() {
   // Drawer state
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [drawerMember, setDrawerMember] = useState<Member | null>(null)
+
+  // Register link dialog state
+  const [registerLinkOpen, setRegisterLinkOpen] = useState(false)
+  const [registerLink, setRegisterLink] = useState('')
+  const [registerLinkLoading, setRegisterLinkLoading] = useState(false)
 
   // Fetch departments (all members with department field, no pagination)
   const fetchDepartments = useCallback(async () => {
@@ -319,6 +324,37 @@ export function MembersPage() {
       photo: member.photo,
     })
     setDialogOpen(true)
+  }
+
+  const handleOpenRegisterLink = async () => {
+    setRegisterLinkLoading(true)
+    try {
+      const res = await fetch('/api/churches/registration-link', {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setRegisterLink(data.url || '')
+        setRegisterLinkOpen(true)
+      } else {
+        const err = await res.json()
+        toast.error(err.error || 'Erreur lors de la génération du lien')
+      }
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setRegisterLinkLoading(false)
+    }
+  }
+
+  const handleCopyRegisterLink = async () => {
+    if (!registerLink) return
+    try {
+      await navigator.clipboard.writeText(registerLink)
+      toast.success('Lien copié dans le presse-papiers !')
+    } catch {
+      toast.error('Impossible de copier le lien')
+    }
   }
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -579,6 +615,10 @@ export function MembersPage() {
           </Button>
           <Button variant="outline" onClick={() => setImportDialogOpen(true)} className="gap-2">
             <FileSpreadsheet className="h-4 w-4" /> Importer CSV
+          </Button>
+          <Button variant="outline" onClick={handleOpenRegisterLink} disabled={registerLinkLoading} className="gap-2">
+            <Link2 className="h-4 w-4" />
+            {registerLinkLoading ? 'Génération...' : 'Lien d\'inscription'}
           </Button>
           {canCreateMembers(auth.role) && (
             <Button onClick={handleOpenCreate} className="gap-2 w-fit">
@@ -1015,6 +1055,42 @@ export function MembersPage() {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Register Link Dialog */}
+      <Dialog open={registerLinkOpen} onOpenChange={setRegisterLinkOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Lien d'inscription de l'église
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Partagez ce lien unique pour que membres et personnel s'inscrivent
+             {" "}eux-mêmes dans votre système. Ils pourront téléverser leur photo et
+              seront directement ajoutés à votre liste de membres.
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                readOnly
+                value={registerLink}
+                placeholder="Génération du lien..."
+                className="font-mono text-xs"
+              />
+            </div>
+            <Button onClick={handleCopyRegisterLink} className="w-full gap-2">
+              <Link2 className="h-4 w-4" />
+              Copier le lien
+            </Button>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Fermer</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
