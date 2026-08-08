@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { normalizeCurrencyCode, SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { NextRequest } from 'next/server'
 
 async function getAuth(request: NextRequest) {
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
       _sum: { amount: true },
     })
 
-    const baseCurrency = (church?.currency || 'USD').toUpperCase()
+    const baseCurrency = normalizeCurrencyCode(church?.currency)
     const baseInitialCapital = church?.initialCapital || 0
 
     const currencies: Record<string, { initialCapital: number; revenue: number; expense: number; balance: number }> = {
@@ -91,14 +92,14 @@ export async function GET(request: NextRequest) {
     }
 
     for (const item of totals) {
-      const curr = (item.currency || 'USD').toUpperCase() as 'USD' | 'EUR' | 'CDF'
+      const curr = normalizeCurrencyCode(item.currency) as 'USD' | 'EUR' | 'CDF'
       if (currencies[curr]) {
         if (item.type === 'revenue') currencies[curr].revenue += item._sum.amount || 0
         if (item.type === 'expense') currencies[curr].expense += item._sum.amount || 0
       }
     }
 
-    for (const curr of ['USD', 'EUR', 'CDF'] as const) {
+    for (const curr of SUPPORTED_CURRENCIES) {
       currencies[curr].balance = currencies[curr].initialCapital + currencies[curr].revenue - currencies[curr].expense
     }
 

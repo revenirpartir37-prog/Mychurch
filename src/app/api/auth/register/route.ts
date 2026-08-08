@@ -3,6 +3,7 @@ import { createAuditLog } from '@/lib/audit'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
 import { createSupabaseUser } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/emails'
+import { normalizeCurrencyCode } from '@/lib/currency'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         city: data.city,
         province: data.province,
         country: data.country,
-        currency: data.currency,
+        currency: normalizeCurrencyCode(data.currency),
         initialCapital: data.initialCapital,
       },
     })
@@ -123,14 +124,18 @@ export async function POST(request: NextRequest) {
       details: `Inscription de l'église "${church.name}" par ${data.firstName} ${data.lastName} (${data.email})`,
     })
 
-    // Email de bienvenue avec les identifiants (non bloquant)
-    sendWelcomeEmail({
-      to: data.email,
-      firstName: data.firstName,
-      churchName: church.name,
-      email: data.email,
-      password: data.password,
-    }).catch((e) => console.error('Welcome email failed:', e))
+    // Email de bienvenue avec les identifiants (attendu mais ne bloque jamais l'inscription)
+    try {
+      await sendWelcomeEmail({
+        to: data.email,
+        firstName: data.firstName,
+        churchName: church.name,
+        email: data.email,
+        password: data.password,
+      })
+    } catch (e) {
+      console.error('Welcome email failed:', e)
+    }
 
     return Response.json({
       user: userWithoutPassword,

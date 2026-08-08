@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 import { CREATOR, REVENUE_LABELS, EXPENSE_LABELS, CURRENCY_LABELS, type RevenueCategory, type ExpenseCategory, type Currency, type TransactionLocation } from '@/lib/constants'
+import { normalizeCurrencyCode, currencySymbol } from '@/lib/currency'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +59,7 @@ export function FinancesPage() {
     { USD: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }, EUR: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }, CDF: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 } }
   )
   const [nextRefNumber, setNextRefNumber] = useState('REF-000001')
+  const [churchCurrency, setChurchCurrency] = useState('USD')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [members, setMembers] = useState<{ id: string; firstName: string; lastName: string }[]>([])
@@ -103,8 +105,8 @@ export function FinancesPage() {
           expense: data.totals?.expense || 0,
           balance: data.totals?.balance || 0,
         })
-        // Multi-currency balances
         if (data.currencies) setCurrencies(data.currencies)
+        if (data.churchCurrency) setChurchCurrency(data.churchCurrency)
         // Next reference number
         if (data.nextReferenceNumberFormatted) setNextRefNumber(data.nextReferenceNumberFormatted)
       }
@@ -594,7 +596,7 @@ export function FinancesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Total Compte rendus</p>
-                <p className="text-xl font-bold text-emerald-500 tabular-nums">{totals.revenue.toFixed(2)} USD</p>
+                <p className="text-xl font-bold text-emerald-500 tabular-nums">{totals.revenue.toFixed(2)} {currencySymbol(churchCurrency)}</p>
               </div>
             </div>
             {sparklineRevenue.length > 1 && (
@@ -622,7 +624,7 @@ export function FinancesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Total Dépenses</p>
-                <p className="text-xl font-bold text-rose-500 tabular-nums">{totals.expense.toFixed(2)} USD</p>
+                <p className="text-xl font-bold text-rose-500 tabular-nums">{totals.expense.toFixed(2)} {currencySymbol(churchCurrency)}</p>
               </div>
             </div>
             {sparklineExpense.length > 1 && (
@@ -650,7 +652,7 @@ export function FinancesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Solde</p>
-                <p className="text-xl font-bold text-violet-500 tabular-nums">{totals.balance.toFixed(2)} USD</p>
+                <p className="text-xl font-bold text-violet-500 tabular-nums">{totals.balance.toFixed(2)} {currencySymbol(churchCurrency)}</p>
               </div>
             </div>
             {sparklineBalance.length > 1 && (
@@ -920,7 +922,7 @@ export function FinancesPage() {
                         {t.description || '—'}
                       </TableCell>
                       <TableCell className={`font-semibold ${t.type === 'revenue' ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {t.type === 'revenue' ? '+' : '-'}{t.amount.toFixed(2)} {t.currency}
+                        {t.type === 'revenue' ? '+' : '-'}{t.amount.toFixed(2)} {currencySymbol(t.currency)}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <Badge variant="outline" className="gap-1">
@@ -1051,9 +1053,9 @@ export function FinancesPage() {
             </div>
             {/* Available balance warning for expenses */}
             {(() => {
-              const currInfo = currencies[form.currency] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
-              const symbolMap: Record<string, string> = { USD: '$', EUR: '€', CDF: 'FC' }
-              const sym = symbolMap[form.currency] || form.currency
+              const normCurr = normalizeCurrencyCode(form.currency)
+              const currInfo = currencies[normCurr] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
+              const sym = currencySymbol(form.currency)
               const enteredAmount = parseFloat(form.amount) || 0
               const isOver = form.type === 'expense' && enteredAmount > 0 && enteredAmount > currInfo.balance
               if (form.type === 'expense') return (

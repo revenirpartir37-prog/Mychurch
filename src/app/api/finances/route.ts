@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
+import { normalizeCurrencyCode, SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') || ''
     const category = searchParams.get('category') || ''
-    const currency = searchParams.get('currency') || ''
+    const currency = normalizeCurrencyCode(searchParams.get('currency') || '')
     const location = searchParams.get('location') || ''
     const memberId = searchParams.get('memberId') || ''
     const startDate = searchParams.get('startDate') || ''
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
       select: { currency: true, initialCapital: true },
     })
 
-    const baseCurrency = (church?.currency || 'USD').toUpperCase()
+    const baseCurrency = normalizeCurrencyCode(church?.currency)
     const baseInitialCapital = church?.initialCapital || 0
 
     const [transactions, total, multiCurrencyTotals, totalCount] = await Promise.all([
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
       db.transaction.count({ where: { churchId: auth.churchId } }),
     ])
 
-    // Build multi-currency balances structure
+    // Build multi-currency balances structure (ISO codes)
     const currencies = {
       USD: { initialCapital: baseCurrency === 'USD' ? baseInitialCapital : 0, revenue: 0, expense: 0, balance: 0 },
       EUR: { initialCapital: baseCurrency === 'EUR' ? baseInitialCapital : 0, revenue: 0, expense: 0, balance: 0 },
@@ -110,14 +111,14 @@ export async function GET(request: NextRequest) {
     }
 
     for (const item of multiCurrencyTotals) {
-      const curr = (item.currency || 'USD').toUpperCase() as 'USD' | 'EUR' | 'CDF'
+      const curr = normalizeCurrencyCode(item.currency) as 'USD' | 'EUR' | 'CDF'
       if (currencies[curr]) {
         if (item.type === 'revenue') currencies[curr].revenue += item._sum.amount || 0
         if (item.type === 'expense') currencies[curr].expense += item._sum.amount || 0
       }
     }
 
-    for (const curr of ['USD', 'EUR', 'CDF'] as const) {
+    for (const curr of SUPPORTED_CURRENCIES) {
       currencies[curr].balance = currencies[curr].initialCapital + currencies[curr].revenue - currencies[curr].expense
     }
 
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
       currencies,
+      churchCurrency: baseCurrency,
       nextReferenceNumber: nextRefNumber,
       nextReferenceNumberFormatted: nextRefNumberFormatted,
       totals: {
@@ -158,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = createTransactionSchema.parse(body)
-    const targetCurrency = (data.currency || 'USD').toUpperCase()
+    const targetCurrency = normalizeCurrencyCode(data.currency)
 
     // 1. Fetch current balance for the selected currency
     const church = await db.church.findUnique({
@@ -166,7 +168,7 @@ export async function POST(request: NextRequest) {
       select: { currency: true, initialCapital: true },
     })
 
-    const baseCurrency = (church?.currency || 'USD').toUpperCase()
+    const baseCurrency = normalizeCurrencyCode(church?.currency)
     const initialCapital = baseCurrency === targetCurrency ? (church?.initialCapital || 0) : 0
 
     const currencyTotals = await db.transaction.groupBy({
@@ -283,7 +285,7 @@ export async function PUT(request: NextRequest) {
     if (data.type !== undefined) updateData.type = data.type
     if (data.category !== undefined) updateData.category = data.category
     if (data.amount !== undefined) updateData.amount = data.amount
-    if (data.currency !== undefined) updateData.currency = data.currency
+    if (data.currency !== undefined) updateData.currency = normalizeCurrencyCode(data.currency)
     if (data.location !== undefined) updateData.location = data.location
     if (data.description !== undefined) updateData.description = data.description
     if (data.date !== undefined) updateData.date = data.date ? new Date(data.date) : null
