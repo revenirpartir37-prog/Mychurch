@@ -1,4 +1,25 @@
 import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
+
+// SMTP (recommandé) : Gmail/Outlook/etc. envoient à n'importe quel destinataire,
+// contrairement au sandbox Resend (qui, sans domaine vérifié, limite à votre propre email).
+// La couche SMTP est PRIORITAIRE si SMTP_USER et SMTP_PASS sont configurés ; sinon on bascule sur Resend.
+let smtpTransport: nodemailer.Transporter | null = null
+
+function getSmtpTransport(): nodemailer.Transporter | null {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null
+  if (smtpTransport) return smtpTransport
+  smtpTransport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: true,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
+  return smtpTransport
+}
 
 function getResend(): Resend | null {
   if (!process.env.RESEND_API_KEY) return null
@@ -6,7 +27,43 @@ function getResend(): Resend | null {
 }
 
 export function getEmailFrom(): string {
-  return process.env.EMAIL_FROM || 'MYCHURCH <onboarding@resend.dev>'
+  return process.env.EMAIL_FROM || (process.env.SMTP_USER ? `MYCHURCH <${process.env.SMTP_USER}>` : 'MYCHURCH <onboarding@resend.dev>')
+}
+
+async function sendViaSmtp(input: { to: string; subject: string; html: string }) {
+  const transport = getSmtpTransport()
+  if (!transport) return false
+  await transport.sendMail({
+    from: getEmailFrom(),
+    to: input.to,
+    subject: input.subject,
+    html: input.html,
+  })
+  return true
+}
+
+async function sendViaResend(input: { to: string; subject: string; html: string }) {
+  const resend = getResend()
+  if (!resend) return 'no-resend'
+  const result = await resend.emails.send({
+    from: getEmailFrom(),
+    to: input.to,
+    subject: input.subject,
+    html: input.html,
+  })
+  if (result.error) {
+    throw new Error(`Resend error: ${result.error.message || 'unknown'}`)
+  }
+  return 'sent'
+}
+
+export async function sendEmail(input: { to: string; subject: string; html: string; tag: string }) {
+  const viaSmtp = await sendViaSmtp(input) || false
+  if (viaSmtp) return
+  const viaResend = await sendViaResend(input)
+  if (viaResend === 'no-resend') {
+    throw new Error(`[${input.tag}] Aucun transport email configuré (SMTP_USER/SMTP_PASS ou RESEND_API_KEY)`)
+  }
 }
 
 function layout(title: string, subtitle: string, body: string): string {
@@ -53,21 +110,12 @@ export async function sendWelcomeEmail(input: {
     </p>
     <p style="margin: 0; color: #6b7280; font-size: 13px;">Cordialement,<br/>L'équipe MYCHURCH</p>
   `
-  const resend = getResend()
-  if (!resend) {
-    console.log(`[WelcomeEmail] ${input.email} (Resend non configuré)`)
-    return
-  }
-  const result = await resend.emails.send({
-    from: getEmailFrom(),
+  await sendEmail({
     to: input.to,
     subject: `MYCHURCH - Bienvenue sur ${input.churchName}`,
     html: layout('Bienvenue', 'Vos accès à votre compte', body),
+    tag: 'WelcomeEmail',
   })
-  if (result.error) {
-    console.error(`[WelcomeEmail] Echec Resend pour ${input.email}:`, result.error)
-    throw new Error(`Welcome email failed: ${result.error.message || 'Resend error'}`)
-  }
 }
 
 // Email de réinitialisation du mot de passe (code OTP).
@@ -88,19 +136,10 @@ export async function sendPasswordResetEmail(email: string, otpCode: string, chu
       Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
     </p>
   `
-  const resend = getResend()
-  if (!resend) {
-    console.log(`[ResetEmail] ${email} (Resend non configuré)`)
-    return
-  }
-  const result = await resend.emails.send({
-    from: getEmailFrom(),
+  await sendEmail({
     to: email,
     subject: 'MYCHURCH - Réinitialisation du mot de passe',
     html: layout('Réinitialisation', 'Code de réinitialisation', body),
+    tag: 'ResetEmail',
   })
-  if (result.error) {
-    console.error(`[ResetEmail] Echec Resend pour ${email}:`, result.error)
-    throw new Error(`Reset email failed: ${result.error.message || 'Resend error'}`)
-  }
 }

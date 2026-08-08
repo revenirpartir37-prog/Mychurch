@@ -1,13 +1,7 @@
 import { db } from '@/lib/db'
-import { getEmailFrom } from '@/lib/emails'
+import { sendEmail } from '@/lib/emails'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
-import { Resend } from 'resend'
-
-function getResend(): Resend | null {
-  if (!process.env.RESEND_API_KEY) return null
-  return new Resend(process.env.RESEND_API_KEY)
-}
 
 const sendOtpSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -58,21 +52,7 @@ async function sendOtpEmail(email: string, otpCode: string, churchName: string, 
     </div>
   `
 
-  const resendClient = getResend()
-  if (resendClient) {
-    const result = await resendClient.emails.send({
-      from: getEmailFrom(),
-      to: email,
-      subject,
-      html,
-    })
-    if (result.error) {
-      console.error(`[OTP] Echec Resend pour ${email}:`, result.error)
-      throw new Error(`OTP email failed: ${result.error.message || 'Resend error'}`)
-    }
-  } else {
-    console.log(`[OTP] Code ${otpCode} pour ${email} (Resend non configuré)`)
-  }
+  await sendEmail({ to: email, subject, html, tag: 'OTP' })
 }
 
 export async function POST(request: NextRequest) {
