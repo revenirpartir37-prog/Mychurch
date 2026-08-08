@@ -151,59 +151,26 @@ export function DashboardPage() {
       const token = auth.token
       const headers = { 'Authorization': `Bearer ${token}` }
 
-      const fetchJson = async (url: string) => {
-        try {
-          const r = await fetch(url, { headers })
-          if (!r.ok) return null
-          return await r.json()
-        } catch {
-          return null
-        }
-      }
+      const res = await fetch('/api/dashboard', { headers })
+      if (!res.ok) return
+      const data = await res.json()
 
-      const [
-        financeData,
-        attendanceData,
-        membersListData,
-        auditData,
-        eventsListData,
-        debtsData,
-      ] = await Promise.all([
-        fetchJson('/api/finances?limit=5'),
-        fetchJson('/api/attendance?limit=1'),
-        fetchJson('/api/members?limit=5&sort=desc'),
-        fetchJson('/api/audit-logs?limit=8'),
-        fetchJson('/api/events?limit=5'),
-        auth.role === 'admin' ? fetchJson('/api/debts?status=pending&limit=5') : Promise.resolve(null),
-      ])
-
-      const memberTotal = membersListData?.pagination?.total ?? membersListData?.total ?? 0
-      const eventTotal = eventsListData?.pagination?.total ?? eventsListData?.total ?? 0
-      const financeTotals = financeData?.totals ?? {}
-      const attendanceTotal = attendanceData?.pagination?.total ?? attendanceData?.total ?? 0
-
+      const statsData = data.stats ?? {}
       setStats({
-        totalMembers: memberTotal,
-        monthlyRevenue: financeTotals.revenue ?? financeData?.total ?? 0,
-        totalExpense: financeTotals.expense ?? 0,
-        upcomingEvents: eventTotal,
-        monthlyAttendance: attendanceTotal,
+        totalMembers: statsData.totalMembers ?? 0,
+        monthlyRevenue: statsData.monthlyRevenue ?? 0,
+        totalExpense: statsData.totalExpense ?? 0,
+        upcomingEvents: statsData.upcomingEvents ?? 0,
+        monthlyAttendance: statsData.monthlyAttendance ?? 0,
       })
 
-      if (financeData) {
-        setRecentTransactions(financeData.transactions ?? financeData.data ?? [])
-      }
+      setRecentTransactions(data.recentTransactions ?? [])
+      setRecentMembers(data.recentMembers ?? [])
+      setAuditLogs(data.auditLogs ?? [])
+      setPendingDebts(data.pendingDebts ?? [])
 
-      if (membersListData) {
-        setRecentMembers(membersListData.members ?? membersListData.data ?? [])
-      }
-
-      if (auditData) {
-        setAuditLogs(auditData.logs ?? [])
-      }
-
-      if (eventsListData) {
-        const allEvents: UpcomingEvent[] = (eventsListData.events ?? []).map((e: any) => ({
+      if (Array.isArray(data.upcomingEvents)) {
+        const allEvents: UpcomingEvent[] = data.upcomingEvents.map((e: any) => ({
           id: e.id,
           title: e.title,
           type: e.type,
@@ -211,12 +178,7 @@ export function DashboardPage() {
           location: e.location,
         }))
         const now = new Date()
-        const futureEvents = allEvents.filter(e => new Date(e.startDate) > now)
-        setUpcomingEvents(futureEvents)
-      }
-
-      if (debtsData) {
-        setPendingDebts(debtsData.debts ?? [])
+        setUpcomingEvents(allEvents.filter((e) => new Date(e.startDate) > now))
       }
     } catch (err) {
       console.error('Dashboard load error:', err)

@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect } from 'react'
 import {
   Sidebar,
   SidebarContent,
@@ -63,33 +62,11 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 export function AppSidebar() {
-  const { currentView, setCurrentView, auth, unreadCount, setUnreadCount } = useAppStore()
+  const { currentView, setCurrentView, auth, unreadCount } = useAppStore()
 
   const fullName = auth.firstName && auth.lastName
     ? `${auth.firstName} ${auth.lastName}`
     : auth.email || 'Utilisateur'
-
-  // Fetch unread notification count on mount
-  useEffect(() => {
-    if (!auth.token) return
-
-    const fetchUnreadCount = async () => {
-      try {
-        const res = await fetch('/api/notifications?isRead=false&limit=1', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          const count = data.unreadCount ?? (data.notifications ?? data.data ?? []).length
-          setUnreadCount(count)
-        }
-      } catch {
-        // silent
-      }
-    }
-
-    fetchUnreadCount()
-  }, [auth.token, setUnreadCount])
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border bg-gradient-to-b from-background to-background/80">

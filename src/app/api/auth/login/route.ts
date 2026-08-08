@@ -1,7 +1,6 @@
 import { db } from '@/lib/db'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
 import { createAuditLog } from '@/lib/audit'
-import { verifySupabasePassword, createSupabaseUser } from '@/lib/supabase'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
@@ -29,7 +28,6 @@ export async function POST(request: NextRequest) {
     if (!church) {
       return Response.json({ error: 'Église non trouvée avec cet email' }, { status: 404 })
     }
-
     if (!church.isActive) {
       return Response.json({ error: 'Le compte de cette église est désactivé' }, { status: 403 })
     }
@@ -42,63 +40,75 @@ export async function POST(request: NextRequest) {
         role: data.role,
       },
     })
-
     if (!user) {
       return Response.json({ error: 'Identifiants invalides ou rôle incorrect' }, { status: 401 })
     }
-
     if (!user.isActive) {
       return Response.json({ error: 'Ce compte utilisateur est désactivé' }, { status: 403 })
     }
 
+    // --- Password verification ---
+    let passwordValid = false
     let supabaseUid: string | null = null
-    // Verify password via Supabase Auth first
+
+    // Step 1: Try Supabase Auth (completely safe — never throws to outer catch)
     try {
-      supabaseUid = await verifySupabasePassword(user.email, data.password)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
+        const { createClient } = await import('@supabase/supabase-js')
+        const client = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false },
+        })
+        const { data: authData, error } = await client.auth.signInWithPassword({
+          email: userEmail,
+          password: data.password,
+        })
+        if (!error && authData?.user) {
+          passwordValid = true
+          supabaseUid = authData.user.id
+        }
+      }
     } catch {
-      // Fallback: user was created via users-management or Supabase Auth unavailable.
-      // Check the local bcrypt hash.
-      const bcryptOk = await bcrypt.compare(data.password, user.passwordHash).catch(() => false)
-      if (!bcryptOk) {
-        return Response.json({ error: 'Identifiants invalides' }, { status: 401 })
-      }
-      // Password is valid locally — attempt to create Supabase Auth user non-blockingly
+      // Supabase unavailable — fall through to bcrypt
+    }
+
+    // Step 2: Fallback to bcrypt if Supabase didn't work
+    if (!passwordValid) {
       try {
-        supabaseUid = await createSupabaseUser(user.email, data.password)
+        passwordValid = await bcrypt.compare(data.password, user.passwordHash)
       } catch {
-        supabaseUid = null
+        passwordValid = false
       }
     }
 
-    if (supabaseUid) {
-      try {
-        await db.user.update({ where: { id: user.id }, data: { firebaseUid: supabaseUid } })
-      } catch {
-        // Ignore update failure
-      }
+    if (!passwordValid) {
+      return Response.json({ error: 'Identifiants invalides' }, { status: 401 })
     }
 
-    // Check subscription status
-    const subscription = await db.subscription.findFirst({
-      where: {
-        churchId: church.id,
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    // Update Supabase UID (non-blocking)
+    if (supabaseUid && supabaseUid !== user.firebaseUid) {
+      db.user.update({ where: { id: user.id }, data: { firebaseUid: supabaseUid } }).catch(() => {})
+    }
 
-    const isSubscriptionExpired = !subscription ||
-      subscription.status !== 'active' ||
-      subscription.endDate < new Date()
-
-    // Update last login
+    // Check subscription status (non-blocking if fails)
+    let subscription: Awaited<ReturnType<typeof db.subscription.findFirst>> = null
     try {
-      await db.user.update({
-        where: { id: user.id },
-        data: { lastLogin: new Date() },
+      subscription = await db.subscription.findFirst({
+        where: { churchId: church.id },
+        orderBy: { createdAt: 'desc' },
       })
     } catch {
       // Non-blocking
     }
+
+    const isSubscriptionExpired =
+      !subscription ||
+      subscription.status !== 'active' ||
+      subscription.endDate < new Date()
+
+    // Update last login (non-blocking)
+    db.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }).catch(() => {})
 
     // Generate JWT tokens
     const payload = {
@@ -108,13 +118,15 @@ export async function POST(request: NextRequest) {
       role: user.role,
       churchName: church.name,
     }
-    const token = await generateAccessToken(payload)
-    const refreshToken = await generateRefreshToken(user.id)
+    const [token, refreshToken] = await Promise.all([
+      generateAccessToken(payload),
+      generateRefreshToken(user.id),
+    ])
 
     // Return user without passwordHash
     const { passwordHash: _, ...userWithoutPassword } = user
 
-    // Log audit
+    // Log audit (non-blocking)
     createAuditLog({
       churchId: church.id,
       userId: user.id,
@@ -132,9 +144,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: 'Données de formulaire invalides', details: error.issues }, { status: 400 })
+      return Response.json(
+        { error: 'Données de formulaire invalides', details: error.issues },
+        { status: 400 }
+      )
     }
     console.error('Login error:', error)
-    return Response.json({ error: 'Erreur interne du serveur lors de la connexion' }, { status: 500 })
+    return Response.json({ error: 'Identifiants invalides ou erreur de connexion' }, { status: 500 })
   }
 }
