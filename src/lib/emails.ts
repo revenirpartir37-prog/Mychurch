@@ -5,6 +5,10 @@ function getResend(): Resend | null {
   return new Resend(process.env.RESEND_API_KEY)
 }
 
+export function getEmailFrom(): string {
+  return process.env.EMAIL_FROM || 'MYCHURCH <onboarding@resend.dev>'
+}
+
 function layout(title: string, subtitle: string, body: string): string {
   return `
     <div style="max-width: 480px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f9fafb; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
@@ -54,12 +58,16 @@ export async function sendWelcomeEmail(input: {
     console.log(`[WelcomeEmail] ${input.email} (Resend non configuré)`)
     return
   }
-  await resend.emails.send({
-    from: 'MYCHURCH <onboarding@resend.dev>',
+  const result = await resend.emails.send({
+    from: getEmailFrom(),
     to: input.to,
     subject: `MYCHURCH - Bienvenue sur ${input.churchName}`,
     html: layout('Bienvenue', 'Vos accès à votre compte', body),
   })
+  if (result.error) {
+    console.error(`[WelcomeEmail] Echec Resend pour ${input.email}:`, result.error)
+    throw new Error(`Welcome email failed: ${result.error.message || 'Resend error'}`)
+  }
 }
 
 // Email de réinitialisation du mot de passe (code OTP).
@@ -85,10 +93,14 @@ export async function sendPasswordResetEmail(email: string, otpCode: string, chu
     console.log(`[ResetEmail] ${email} (Resend non configuré)`)
     return
   }
-  await resend.emails.send({
-    from: 'MYCHURCH <onboarding@resend.dev>',
+  const result = await resend.emails.send({
+    from: getEmailFrom(),
     to: email,
     subject: 'MYCHURCH - Réinitialisation du mot de passe',
     html: layout('Réinitialisation', 'Code de réinitialisation', body),
   })
+  if (result.error) {
+    console.error(`[ResetEmail] Echec Resend pour ${email}:`, result.error)
+    throw new Error(`Reset email failed: ${result.error.message || 'Resend error'}`)
+  }
 }

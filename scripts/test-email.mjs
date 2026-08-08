@@ -91,10 +91,11 @@ async function sendTestEmail() {
   console.log('📤 Envoi en cours...\n')
 
   const resend = new Resend(RESEND_API_KEY)
+const EMAIL_FROM = process.env.EMAIL_FROM || 'MYCHURCH <onboarding@resend.dev>'
 
   try {
     const result = await resend.emails.send({
-      from: 'MYCHURCH <onboarding@resend.dev>',
+      from: EMAIL_FROM,
       to: TO_EMAIL,
       subject: 'MYCHURCH – Code de vérification OTP (TEST)',
       html,
