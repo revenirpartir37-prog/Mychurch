@@ -299,21 +299,6 @@ export function MessagesPage() {
     return () => window.clearInterval(intervalId)
   }, [fetchAllMessages])
 
-  useEffect(() => {
-    if (!selectedConversation) return
-
-    const synced = conversations.find((conv) => conv.peerId === selectedConversation.peerId)
-    if (!synced) return
-
-    setSelectedConversation((prev) => {
-      if (!prev) return prev
-      if (prev.lastMessage.id === synced.lastMessage.id && prev.messages.length === synced.messages.length) {
-        return prev
-      }
-      return synced
-    })
-  }, [conversations, selectedConversation?.peerId])
-
   /* ─── Filtered conversations ─── */
 
   const filteredConversations = useMemo(() => {

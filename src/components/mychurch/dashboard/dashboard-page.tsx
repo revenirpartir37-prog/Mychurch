@@ -15,8 +15,6 @@ import {
   Calendar,
   ClipboardCheck,
   ArrowRight,
-  TrendingUp,
-  TrendingDown,
   CreditCard,
   Send,
   BarChart3,
@@ -25,6 +23,9 @@ import {
   CheckCircle,
   MapPin,
   X,
+  RefreshCcw,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts'
 import { useAppStore } from '@/store/app-store'
@@ -90,6 +91,7 @@ export function DashboardPage() {
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([])
   const [pendingDebts, setPendingDebts] = useState<any[]>([])
   const [pendingDebtsLoading, setPendingDebtsLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const scrollYRef = useRef(0)
   const bienvenueRef = useRef<HTMLDivElement>(null)
 
@@ -184,7 +186,13 @@ export function DashboardPage() {
       console.error('Dashboard load error:', err)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
+  }
+
+  const handleRefreshDashboard = async () => {
+    setRefreshing(true)
+    await loadDashboardData()
   }
 
   const handleApproveDebt = async (debtId: string, action: 'approved' | 'rejected', comment = '') => {
@@ -219,7 +227,6 @@ export function DashboardPage() {
       bg: 'bg-teal-500/10',
       gradient: 'from-teal-500/5 via-teal-400/3 to-transparent',
       borderGradient: 'from-teal-400 via-teal-500 to-teal-600',
-      trend: { text: '↑ 12% ce mois', color: 'text-emerald-600 dark:text-emerald-400' },
       view: 'members' as const,
     },
     ...(canViewFinances(auth.role) ? [{
@@ -230,7 +237,6 @@ export function DashboardPage() {
       bg: 'bg-emerald-500/10',
       gradient: 'from-emerald-500/5 via-emerald-400/3 to-transparent',
       borderGradient: 'from-emerald-400 via-emerald-500 to-emerald-600',
-      trend: { text: '↑ 8% vs dernier mois', color: 'text-emerald-600 dark:text-emerald-400' },
       view: 'finances' as const,
     }] : []),
     {
@@ -241,7 +247,6 @@ export function DashboardPage() {
       bg: 'bg-amber-500/10',
       gradient: 'from-amber-500/5 via-amber-400/3 to-transparent',
       borderGradient: 'from-amber-400 via-amber-500 to-amber-600',
-      trend: { text: '3 à venir', color: 'text-amber-600 dark:text-amber-400' },
       view: 'events' as const,
     },
     {
@@ -252,7 +257,6 @@ export function DashboardPage() {
       bg: 'bg-rose-500/10',
       gradient: 'from-rose-500/5 via-rose-400/3 to-transparent',
       borderGradient: 'from-rose-400 via-rose-500 to-rose-600',
-      trend: { text: '↓ 3% vs dernière semaine', color: 'text-rose-600 dark:text-rose-400' },
       view: 'attendance' as const,
     },
   ]
@@ -355,8 +359,17 @@ export function DashboardPage() {
                   {today}
                 </p>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 shrink-0"
+                onClick={handleRefreshDashboard}
+                disabled={refreshing || loading}
+              >
+                <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Actualiser
+              </Button>
             </div>
-            
           </CardContent>
         </Card>
       </div>
@@ -391,15 +404,6 @@ export function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-muted-foreground">{stat.title}</p>
                       <p className="text-3xl font-bold mt-1">{stat.value}</p>
-                      {/* Trend indicator */}
-                      <div className={`flex items-center gap-1 mt-1.5 text-xs font-medium ${stat.trend.color}`}>
-                        {stat.trend.text.startsWith('↑') ? (
-                          <TrendingUp className="h-3 w-3" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3" />
-                        )}
-                        <span>{stat.trend.text.replace(/^[↑↓]\s/, '')}</span>
-                      </div>
                     </div>
                     <div className={`p-4 rounded-xl ${stat.bg}`}>
                       <stat.icon className={`h-7 w-7 ${stat.color}`} />
