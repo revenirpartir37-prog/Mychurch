@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
+import { notifyChurchUsers, notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -148,6 +149,23 @@ export async function POST(request: NextRequest) {
       details: `Membre créé: ${data.firstName} ${data.lastName}`,
     })
 
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      excludeUserIds: [auth.userId],
+      title: 'Nouveau membre enregistré',
+      message: `${data.firstName} ${data.lastName} a été ajouté.`,
+      type: 'info',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Membre créé',
+      message: `${data.firstName} ${data.lastName} a été enregistré avec succès.`,
+      type: 'success',
+      push: false,
+    })
+
     return Response.json({ member }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -211,6 +229,23 @@ export async function PUT(request: NextRequest) {
       details: `Membre modifié: ${existing.firstName} ${existing.lastName} (ID: ${id})`,
     })
 
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      excludeUserIds: [auth.userId],
+      title: 'Membre mis à jour',
+      message: `${existing.firstName} ${existing.lastName} a été modifié.`,
+      type: 'warning',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Modification enregistrée',
+      message: `Le profil de ${existing.firstName} ${existing.lastName} a été mis à jour.`,
+      type: 'success',
+      push: false,
+    })
+
     return Response.json({ member })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -251,6 +286,23 @@ export async function DELETE(request: NextRequest) {
         details: `Suppression en masse: ${result.count} membre(s) désactivé(s)`,
       })
 
+      await notifyChurchUsers({
+        churchId: auth.churchId,
+        excludeUserIds: [auth.userId],
+        title: 'Membres désactivés',
+        message: `${result.count} membre(s) ont été désactivé(s).`,
+        type: 'error',
+        push: true,
+      })
+      await notifyUser({
+        churchId: auth.churchId,
+        userId: auth.userId,
+        title: 'Suppression en masse effectuée',
+        message: `${result.count} membre(s) ont été désactivé(s).`,
+        type: 'success',
+        push: false,
+      })
+
       return Response.json({ deleted: result.count })
     }
 
@@ -280,6 +332,23 @@ export async function DELETE(request: NextRequest) {
       userId: auth.userId,
       action: 'delete_member',
       details: `Membre désactivé: ${existing.firstName} ${existing.lastName} (ID: ${id})`,
+    })
+
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      excludeUserIds: [auth.userId],
+      title: 'Membre désactivé',
+      message: `${existing.firstName} ${existing.lastName} a été désactivé.`,
+      type: 'error',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Suppression effectuée',
+      message: `${existing.firstName} ${existing.lastName} a été désactivé.`,
+      type: 'success',
+      push: false,
     })
 
     return Response.json({ member })

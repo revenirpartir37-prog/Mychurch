@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
@@ -43,7 +44,7 @@ export default function RootLayout({
     <html lang="fr" suppressHydrationWarning className="dark">
       <head>
         <link rel="apple-touch-icon" href="/logo-mychurch.png" />
-        <script src="/register-sw.js" />
+        <Script src="/register-sw.js" strategy="afterInteractive" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}

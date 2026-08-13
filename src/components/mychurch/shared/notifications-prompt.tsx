@@ -2,9 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
-import { getOneSignal, requestPushPermission, isSubscribed } from '@/lib/onesignal-client'
+import {
+  getOneSignal,
+  requestPushPermission,
+  isSubscribed,
+  getPushPermissionState,
+} from '@/lib/onesignal-client'
 import { toast } from 'sonner'
-import { Bell, BellRing, X, CheckCircle2 } from 'lucide-react'
+import { Bell, X, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 // Demande d'autorisation des notifications push à la première connexion / inscription.
@@ -35,16 +40,17 @@ export function NotificationsPrompt() {
   async function handleAllow() {
     try {
       await requestPushPermission()
-      // Confirme l'état après le geste utilisateur.
-      const subscribed = await isSubscribed()
-      if (subscribed) {
-        toast.success('Notifications activées. Bienvenue sur MYCHURCH !')
+      toast.success('Notifications activées. Bienvenue sur MYCHURCH !')
+      setVisible(false)
+    } catch (error) {
+      const permission = await getPushPermissionState()
+      if (permission === 'denied') {
+        toast.error('Notifications bloquées. Activez-les dans les paramètres du navigateur.')
       } else {
-        toast.info('Vous pourrez activer les notifications à tout moment.')
+        toast.error(error instanceof Error ? error.message : 'Impossible d’activer les notifications')
       }
-      setVisible(false)
-    } catch {
-      setVisible(false)
+      const subscribed = await isSubscribed()
+      setVisible(!subscribed)
     }
   }
 

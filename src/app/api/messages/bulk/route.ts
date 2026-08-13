@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { notifyUsers } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -101,6 +102,18 @@ export async function POST(request: NextRequest) {
     const notFoundCount = data.recipientMemberIds.filter(
       (id) => !deliveredToMemberIds.includes(id),
     ).length
+
+    if (users.length > 0) {
+      const preview = data.content.length > 120 ? `${data.content.slice(0, 120)}...` : data.content
+      await notifyUsers({
+        churchId: auth.churchId,
+        userIds: users.map((user) => user.id),
+        title: `Nouveau message: ${data.subject}`,
+        message: preview,
+        type: 'info',
+        push: true,
+      })
+    }
 
     return Response.json({
       sent: messages.length,

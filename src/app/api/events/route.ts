@@ -1,6 +1,11 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
+import {
+  dispatchEventRemindersForChurch,
+  notifyChurchUsers,
+  notifyUser,
+} from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -118,6 +123,27 @@ export async function POST(request: NextRequest) {
       details: `Événement créé: ${data.title} (${data.type})`,
     })
 
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      excludeUserIds: [auth.userId],
+      title: 'Nouvel événement',
+      message: `${data.title} est programmé le ${new Date(data.startDate).toLocaleString('fr-FR')}.`,
+      type: 'info',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Événement enregistré',
+      message: `L’événement "${data.title}" a été créé avec succès.`,
+      type: 'success',
+      push: false,
+    })
+    await dispatchEventRemindersForChurch({
+      churchId: auth.churchId,
+      eventIds: [event.id],
+    })
+
     return Response.json({ event }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -173,6 +199,27 @@ export async function PUT(request: NextRequest) {
       details: `Événement modifié (ID: ${id})`,
     })
 
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      excludeUserIds: [auth.userId],
+      title: 'Événement mis à jour',
+      message: `L’événement "${event.title}" a été modifié.`,
+      type: 'warning',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Modification enregistrée',
+      message: `Les changements sur "${event.title}" ont été enregistrés.`,
+      type: 'success',
+      push: false,
+    })
+    await dispatchEventRemindersForChurch({
+      churchId: auth.churchId,
+      eventIds: [event.id],
+    })
+
     return Response.json({ event })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -212,6 +259,23 @@ export async function DELETE(request: NextRequest) {
       userId: auth.userId,
       action: 'delete_event',
       details: `Événement supprimé (ID: ${id})`,
+    })
+
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      excludeUserIds: [auth.userId],
+      title: 'Événement supprimé',
+      message: `L’événement "${existing.title}" a été supprimé.`,
+      type: 'error',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Suppression effectuée',
+      message: `L’événement "${existing.title}" a bien été supprimé.`,
+      type: 'success',
+      push: false,
     })
 
     return Response.json({ success: true })

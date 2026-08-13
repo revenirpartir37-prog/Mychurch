@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
+import { notifyChurchUsers, notifyUser, notifyUsers } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -64,8 +65,32 @@ export async function POST(req: NextRequest) {
     })
     if (status === 'pending') {
       const admins = await db.user.findMany({ where: { churchId: auth.churchId, role: 'admin', isActive: true }, select: { id: true } })
-      await Promise.all(admins.map(a => db.notification.create({ data: { churchId: auth.churchId, userId: a.id, title: "Approbation requise", message: `Dette de ${data.amount} ${data.currency} en attente d'approbation.`, type: 'warning' } })))
+      await notifyUsers({
+        churchId: auth.churchId,
+        userIds: admins.map((admin) => admin.id),
+        title: 'Approbation requise',
+        message: `Dette de ${data.amount} ${data.currency} en attente d'approbation.`,
+        type: 'warning',
+        push: true,
+      })
+    } else {
+      await notifyChurchUsers({
+        churchId: auth.churchId,
+        roles: ['admin', 'treasurer'],
+        title: 'Dette approuvée automatiquement',
+        message: `Dette ${data.amount} ${data.currency} (${data.creditor}) approuvée automatiquement.`,
+        type: 'success',
+        push: true,
+      })
     }
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Dette enregistrée',
+      message: `La dette de ${data.amount} ${data.currency} a été enregistrée (${status}).`,
+      type: 'success',
+      push: false,
+    })
     createAuditLog({ churchId: auth.churchId, userId: auth.userId, action: 'debt_created', details: `${data.amount} ${data.currency} — ${data.creditor} — ${status}` })
     return Response.json({ debt, autoApproved }, { status: 201 })
   } catch (e) {
@@ -87,7 +112,22 @@ export async function PATCH(req: NextRequest) {
     if (existing.status !== 'pending') return Response.json({ error: 'Not pending' }, { status: 409 })
     const debt = await db.debt.update({ where: { id: data.debtId }, data: { status: data.action, approvedBy: auth.userId, approvalComment: data.comment ?? null } })
     const label = data.action === 'approved' ? 'approuvée ✅' : 'rejetée ❌'
-    await db.notification.create({ data: { churchId: auth.churchId, userId: existing.createdBy, title: `Dette ${label}`, message: `${existing.amount} ${existing.currency} — ${label}${data.comment ? '. ' + data.comment : ''}`, type: data.action === 'approved' ? 'success' : 'error' } })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: existing.createdBy,
+      title: `Dette ${label}`,
+      message: `${existing.amount} ${existing.currency} — ${label}${data.comment ? `. ${data.comment}` : ''}`,
+      type: data.action === 'approved' ? 'success' : 'error',
+      push: true,
+    })
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      roles: ['admin', 'treasurer'],
+      title: `Dette ${label}`,
+      message: `Une dette de ${existing.amount} ${existing.currency} a été ${data.action === 'approved' ? 'approuvée' : 'rejetée'}.`,
+      type: data.action === 'approved' ? 'success' : 'error',
+      push: true,
+    })
     createAuditLog({ churchId: auth.churchId, userId: auth.userId, action: `debt_${data.action}`, details: `ID: ${data.debtId}${data.comment ? ' — ' + data.comment : ''}` })
     return Response.json({ debt })
   } catch (e) {

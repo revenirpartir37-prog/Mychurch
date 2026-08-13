@@ -2,6 +2,7 @@ import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { normalizeCurrencyCode, SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { notifyChurchUsers, notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -246,6 +247,23 @@ export async function POST(request: NextRequest) {
       details: `Transaction ${data.type} créée: ${data.category} - ${data.amount} ${targetCurrency} (Réf: ${refNum})`,
     })
 
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      roles: ['admin', 'treasurer'],
+      title: data.type === 'revenue' ? 'Nouvelle entrée financière' : 'Nouvelle dépense',
+      message: `${data.category}: ${data.amount} ${targetCurrency} (Réf ${refNum}).`,
+      type: data.type === 'revenue' ? 'success' : 'warning',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Transaction enregistrée',
+      message: `La transaction ${data.category} (${data.amount} ${targetCurrency}) a été enregistrée.`,
+      type: 'success',
+      push: false,
+    })
+
     return Response.json({ transaction }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -309,6 +327,23 @@ export async function PUT(request: NextRequest) {
       details: `Transaction modifiée (ID: ${id})`,
     })
 
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      roles: ['admin', 'treasurer'],
+      title: 'Transaction mise à jour',
+      message: `La transaction ${transaction.referenceNumber || id} a été modifiée.`,
+      type: 'warning',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Modification enregistrée',
+      message: `La transaction ${transaction.referenceNumber || id} a été mise à jour.`,
+      type: 'success',
+      push: false,
+    })
+
     return Response.json({ transaction })
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -353,6 +388,23 @@ export async function DELETE(request: NextRequest) {
       userId: auth.userId,
       action: 'delete_transaction',
       details: `Transaction supprimée (ID: ${id})`,
+    })
+
+    await notifyChurchUsers({
+      churchId: auth.churchId,
+      roles: ['admin', 'treasurer'],
+      title: 'Transaction supprimée',
+      message: `Une transaction (${existing.referenceNumber || id}) a été supprimée.`,
+      type: 'error',
+      push: true,
+    })
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Suppression effectuée',
+      message: `La transaction ${existing.referenceNumber || id} a été supprimée.`,
+      type: 'success',
+      push: false,
     })
 
     return Response.json({ success: true })

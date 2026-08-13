@@ -1,6 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { sendPushNotification } from '@/lib/onesignal'
+import { notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -16,7 +16,7 @@ const createNotificationSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   title: z.string().min(1, 'Title is required'),
   message: z.string().min(1, 'Message is required'),
-  type: z.string().default('info'),
+  type: z.enum(['info', 'success', 'warning', 'error']).default('info'),
 })
 
 const markReadSchema = z.object({
@@ -102,21 +102,12 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Target user not found' }, { status: 404 })
     }
 
-    const notification = await db.notification.create({
-      data: {
-        churchId: auth.churchId,
-        userId: data.userId,
-        title: data.title,
-        message: data.message,
-        type: data.type,
-      },
-    })
-
-    // Envoie une push OneSignal au destinataire (non bloquant)
-    await sendPushNotification({
+    const notification = await notifyUser({
+      churchId: auth.churchId,
+      userId: data.userId,
       title: data.title,
       message: data.message,
-      userIds: [targetUser.firebaseUid || targetUser.id],
+      type: data.type,
     })
 
     return Response.json({ notification }, { status: 201 })

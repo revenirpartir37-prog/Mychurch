@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -109,6 +110,17 @@ export async function POST(request: NextRequest) {
         sender: { select: { id: true, firstName: true, lastName: true } },
         receiver: { select: { id: true, firstName: true, lastName: true } },
       },
+    })
+
+    const senderFullName = `${message.sender.firstName} ${message.sender.lastName}`.trim()
+    const preview = message.content.length > 120 ? `${message.content.slice(0, 120)}...` : message.content
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: receiver.id,
+      title: `Nouveau message de ${senderFullName}`,
+      message: preview,
+      type: 'info',
+      push: true,
     })
 
     return Response.json({ message }, { status: 201 })

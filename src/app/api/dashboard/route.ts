@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { normalizeCurrencyCode, SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { dispatchEventRemindersForChurch } from '@/lib/notification-dispatch'
 import { NextRequest } from 'next/server'
 
 async function getAuth(request: NextRequest) {
@@ -22,6 +23,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { role, churchId } = auth
+
+    await dispatchEventRemindersForChurch({ churchId })
 
     const [
       memberCount,

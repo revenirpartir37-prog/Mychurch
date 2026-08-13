@@ -18,6 +18,7 @@ import { ROLE_LABELS } from '@/lib/constants'
 import type { UserRole } from '@/lib/constants'
 import Image from 'next/image'
 import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
+import { oneSignalLogout } from '@/components/mychurch/shared/onesignal-provider'
 
 interface AppHeaderProps {
   onToggleSidebar?: () => void
@@ -204,7 +205,13 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
               À propos
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onClick={() => {
+                oneSignalLogout()
+                logout()
+              }}
+              className="text-destructive focus:text-destructive"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Déconnexion
             </DropdownMenuItem>

@@ -116,13 +116,11 @@ export function DebtsPage() {
   const limit = 15
 
   const form = useForm<CreateValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(createSchema) as any,
     defaultValues: { amount: 0, currency: 'USD', creditor: '', description: '' },
   })
 
   const approveForm = useForm<ApproveValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(approveSchema) as any,
     defaultValues: { comment: '' },
   })

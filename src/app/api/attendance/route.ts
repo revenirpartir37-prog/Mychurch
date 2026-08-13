@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -179,6 +180,15 @@ export async function POST(request: NextRequest) {
         results.push(created)
       }
     }
+
+    await notifyUser({
+      churchId: auth.churchId,
+      userId: auth.userId,
+      title: 'Présences enregistrées',
+      message: `${results.length} présence(s) ont été enregistrées.`,
+      type: 'success',
+      push: false,
+    })
 
     return Response.json({ records: results, count: results.length }, { status: 201 })
   } catch (error) {

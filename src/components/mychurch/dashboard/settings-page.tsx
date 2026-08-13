@@ -43,6 +43,12 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { oneSignalLogout } from '@/components/mychurch/shared/onesignal-provider'
+import {
+  getPushPermissionState,
+  isSubscribed,
+  requestPushPermission,
+  type PushPermissionState,
+} from '@/lib/onesignal-client'
 
 interface UserProfile {
   firstName: string
@@ -130,6 +136,18 @@ export function SettingsPage() {
     reader: [],
   })
   const [permissionsSaving, setPermissionsSaving] = useState(false)
+  const [pushPermission, setPushPermission] = useState<PushPermissionState>('default')
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+
+  const refreshPushState = useCallback(async () => {
+    const [permission, subscribed] = await Promise.all([
+      getPushPermissionState(),
+      isSubscribed(),
+    ])
+    setPushPermission(permission)
+    setPushSubscribed(subscribed)
+  }, [])
 
   const fetchThresholds = useCallback(async () => {
     try {
@@ -259,12 +277,13 @@ export function SettingsPage() {
           email: church.email ?? '',
         })
       }
+      await refreshPushState()
     } catch {
       // silent
     } finally {
       setLoading(false)
     }
-  }, [auth.token, auth.churchName])
+  }, [auth.token, auth.churchName, refreshPushState])
 
   useEffect(() => {
     fetchData()
@@ -301,6 +320,20 @@ export function SettingsPage() {
   const handleThemeChange = (themeId: 'professional' | 'light' | 'dark') => {
     setNextTheme(themeId)
     setStoreTheme(themeId)
+  }
+
+  const handleEnablePush = async () => {
+    setPushLoading(true)
+    try {
+      await requestPushPermission()
+      await refreshPushState()
+      toast.success('Notifications push activées avec succès')
+    } catch (error) {
+      await refreshPushState()
+      toast.error(error instanceof Error ? error.message : 'Activation des notifications impossible')
+    } finally {
+      setPushLoading(false)
+    }
   }
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -490,6 +523,47 @@ export function SettingsPage() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/50">
+                <Smartphone className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Notifications push</CardTitle>
+                <CardDescription>
+                  Recevez les messages, actions et rappels d&apos;événements même application fermée
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-4 space-y-4">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Statut des notifications</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Permission: {pushPermission} • Abonnement actif: {pushSubscribed ? 'Oui' : 'Non'}
+                  </p>
+                </div>
+                <Badge variant={pushSubscribed ? 'default' : 'secondary'}>
+                  {pushSubscribed ? 'Actif' : 'Inactif'}
+                </Badge>
+              </div>
+              <Button
+                onClick={handleEnablePush}
+                disabled={pushLoading || pushSubscribed}
+                className="gap-2"
+              >
+                {pushLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {pushSubscribed ? 'Déjà activé' : 'Activer les notifications'}
+              </Button>
+              {pushPermission === 'denied' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Les notifications sont bloquées par le navigateur. Autorisez-les dans les paramètres du site.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1077,4 +1151,3 @@ export function SettingsPage() {
     </div>
   )
 }
-

@@ -28,6 +28,8 @@ type OneSignalInstance = {
 
 let initPromise: Promise<OneSignalInstance | null> | null = null
 
+export type PushPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
+
 function loadScript(): Promise<void> {
   return new Promise((resolve) => {
     if ((window as any).OneSignal) return resolve()
@@ -96,10 +98,19 @@ export function getOneSignal(): Promise<OneSignalInstance | null> {
 // Demande la permission push notifications (à appeler depuis un geste utilisateur).
 export async function requestPushPermission(): Promise<void> {
   const os = await getOneSignal()
-  try {
-    await os?.Notifications?.requestPermission()
-  } catch {
-    // refus possible
+  if (!os) {
+    throw new Error('OneSignal non initialisé')
+  }
+
+  const isSupported = os.Notifications?.isPushSupported?.() ?? false
+  if (!isSupported) {
+    throw new Error('Les notifications push ne sont pas supportées sur cet appareil')
+  }
+
+  await os.Notifications?.requestPermission()
+  const subscribed = await isSubscribed()
+  if (!subscribed) {
+    throw new Error('Permission refusée ou abonnement inactif')
   }
 }
 
@@ -108,8 +119,8 @@ export async function setPushUser(userId: string): Promise<void> {
   const os = await getOneSignal()
   try {
     await os?.login?.(userId)
-  } catch {
-    // ignore
+  } catch (error) {
+    console.error('OneSignal login error:', error)
   }
 }
 
@@ -118,8 +129,8 @@ export async function clearPushUser(): Promise<void> {
   const os = await getOneSignal()
   try {
     await os?.logout?.()
-  } catch {
-    // ignore
+  } catch (error) {
+    console.error('OneSignal logout error:', error)
   }
 }
 
@@ -127,9 +138,18 @@ export async function clearPushUser(): Promise<void> {
 export async function isSubscribed(): Promise<boolean> {
   const os = await getOneSignal()
   if (!os) return false
-  try {
-    return !!os.User?.PushSubscription?.optedIn
-  } catch {
-    return false
-  }
+  return !!os.User?.PushSubscription?.optedIn
+}
+
+export async function getPushPermissionState(): Promise<PushPermissionState> {
+  if (typeof window === 'undefined') return 'unsupported'
+  if (typeof Notification === 'undefined') return 'unsupported'
+
+  const os = await getOneSignal()
+  const supported = os?.Notifications?.isPushSupported?.() ?? false
+  if (!supported) return 'unsupported'
+
+  if (Notification.permission === 'granted') return 'granted'
+  if (Notification.permission === 'denied') return 'denied'
+  return 'default'
 }

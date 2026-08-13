@@ -7,7 +7,7 @@ Plateforme moderne de gestion d'église — Progressive Web App (PWA).
 - **Gestion des membres** — Inscription, photos, cartes de membres (PDF)
 - **Finances** — Revenus/dépenses, rapports, graphiques
 - **Événements & présences** — Planification, suivi des présences
-- **Messages & notifications** — Messagerie interne, push notifications (OneSignal)
+- **Messages & notifications** — Messagerie interne, notifications in-app + push (OneSignal), rappels d'événements
 - **Rapports PDF** — Export avec logo de l'église
 - **PWA** — Installation sur Android, iOS et desktop
 - **Multi-utilisateurs** — Rôles : admin, trésorier, secrétaire, lecteur
@@ -36,6 +36,12 @@ Copiez `.env.example` en `.env` et remplissez vos clés :
 ```bash
 cp .env.example .env
 ```
+
+Variables notifications importantes :
+
+- `NEXT_PUBLIC_ONESIGNAL_APP_ID`
+- `ONESIGNAL_REST_API_KEY`
+- `NOTIFICATIONS_CRON_SECRET` (optionnel, pour déclencher `/api/notifications/reminders` de façon sécurisée)
 
 ## Base de données
 

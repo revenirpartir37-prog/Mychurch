@@ -183,7 +183,6 @@ export async function PATCH(req: NextRequest) {
         const exists = await db.transaction.findUnique({ where: { id: tx.id as string } }).catch(() => null)
         if (!exists) {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await db.transaction.create({ data: { ...(tx as any), churchId: auth.churchId } })
             restoredCount++
           } catch { /* skip constraint violations */ }
@@ -197,7 +196,6 @@ export async function PATCH(req: NextRequest) {
         const exists = await db.event.findUnique({ where: { id: ev.id as string } }).catch(() => null)
         if (!exists) {
           try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await db.event.create({ data: { ...(ev as any), churchId: auth.churchId } })
             restoredCount++
           } catch { /* skip */ }

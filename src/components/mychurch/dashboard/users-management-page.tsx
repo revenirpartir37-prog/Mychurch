@@ -125,13 +125,11 @@ export function UsersManagementPage() {
   const limit = 15
 
   const createForm = useForm<CreateValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(createSchema) as any,
     defaultValues: { firstName: '', lastName: '', email: '', password: '', role: 'reader', phone: '', function: '' },
   })
 
   const editForm = useForm<EditValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(editSchema) as any,
     defaultValues: { firstName: '', lastName: '', email: '', role: 'reader', phone: '', function: '', password: '' },
   })

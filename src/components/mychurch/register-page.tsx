@@ -82,7 +82,6 @@ export function RegisterPage() {
 
   // Step 1 form
   const adminForm = useForm<AdminFormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(adminSchema) as any,
     defaultValues: {
       firstName: '',
@@ -96,7 +95,6 @@ export function RegisterPage() {
 
   // Step 2 form
   const churchForm = useForm<ChurchFormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(churchSchema) as any,
     defaultValues: {
       churchName: '',
