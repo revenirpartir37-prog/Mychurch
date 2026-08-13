@@ -13,8 +13,10 @@ async function getAuth(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cronSecret = process.env.NOTIFICATIONS_CRON_SECRET
-    const providedSecret = request.headers.get('x-notifications-secret')
+    const cronSecret = process.env.NOTIFICATIONS_CRON_SECRET || process.env.CRON_SECRET
+    const providedSecret =
+      request.headers.get('x-notifications-secret') ||
+      request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
 
     if (cronSecret && providedSecret === cronSecret) {
       const churches = await db.church.findMany({ select: { id: true } })
