@@ -27,6 +27,8 @@ import {
   Plus,
   Loader2,
   MessageCircle,
+  Check,
+  CheckCheck,
 } from 'lucide-react'
 import { EmptyState } from '@/components/mychurch/shared/empty-state'
 import { canSendMessages } from '@/lib/frontend-rbac'
@@ -119,6 +121,26 @@ function formatConversationTime(dateStr: string): string {
 function formatMessageTime(dateStr: string): string {
   const d = new Date(dateStr)
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function MessageStatus({ isMine, isRead }: { isMine: boolean; isRead: boolean }) {
+  if (!isMine) return null
+
+  return (
+    <div className="mt-1 flex items-center justify-end gap-1 text-[10px] text-current/80">
+      {isRead ? (
+        <>
+          <CheckCheck className="h-3.5 w-3.5" />
+          <span>Lu</span>
+        </>
+      ) : (
+        <>
+          <Check className="h-3.5 w-3.5" />
+          <span>Envoyé</span>
+        </>
+      )}
+    </div>
+  )
 }
 
 /* ─── Main Component ─── */
@@ -268,6 +290,29 @@ export function MessagesPage() {
       (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
     )
   }, [allMessages, auth.userId])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      fetchAllMessages()
+    }, 10000)
+
+    return () => window.clearInterval(intervalId)
+  }, [fetchAllMessages])
+
+  useEffect(() => {
+    if (!selectedConversation) return
+
+    const synced = conversations.find((conv) => conv.peerId === selectedConversation.peerId)
+    if (!synced) return
+
+    setSelectedConversation((prev) => {
+      if (!prev) return prev
+      if (prev.lastMessage.id === synced.lastMessage.id && prev.messages.length === synced.messages.length) {
+        return prev
+      }
+      return synced
+    })
+  }, [conversations, selectedConversation?.peerId])
 
   /* ─── Filtered conversations ─── */
 
@@ -533,10 +578,12 @@ export function MessagesPage() {
           >
             {message.content}
           </div>
-          {/* Timestamp */}
-          <p className={`text-[10px] text-muted-foreground/60 mt-1 ${isMine ? 'text-right' : 'text-left'}`}>
-            {formatMessageTime(message.createdAt)}
-          </p>
+          <div className={`flex items-center gap-2 ${isMine ? 'justify-end text-primary-foreground/80' : 'justify-start text-muted-foreground'}`}>
+            <p className="text-[10px]">
+              {formatMessageTime(message.createdAt)}
+            </p>
+            {isMine && <MessageStatus isMine isRead={message.isRead} />}
+          </div>
         </div>
       </div>
     )
