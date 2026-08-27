@@ -310,3 +310,25 @@ model DebtPayment {
 
   debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
 }
+
+// ==================== CARD ORDER ====================
+model CardOrder {
+  id              String   @id @default(cuid())
+  userId          String
+  quantity        Int
+  unitPriceUsd    Float    @default(10)
+  totalPriceUsd   Float
+  geniusReference String?  @unique
+  status          String   @default("pending") // pending, completed, failed, expired
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+}
+
+// ==================== CARD CREDIT ====================
+model CardCredit {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  totalPurchased Int      @default(0)
+  totalGenerated Int      @default(0)
+  updatedAt      DateTime @updatedAt
+}

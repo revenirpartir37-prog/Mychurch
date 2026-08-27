@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Generate member card (requires payment verification)
+// POST: Generate member card (requires credit)
 export async function POST(request: NextRequest) {
   try {
     const auth = await getAuth(request)
@@ -91,6 +91,13 @@ export async function POST(request: NextRequest) {
     })
     if (existingCard) {
       return Response.json({ error: 'Member already has a card' }, { status: 409 })
+    }
+
+    // Check card credit
+    const credit = await db.cardCredit.findUnique({ where: { userId: auth.userId } })
+    const remaining = (credit?.totalPurchased ?? 0) - (credit?.totalGenerated ?? 0)
+    if (remaining <= 0) {
+      return Response.json({ error: 'NO_CREDIT_REMAINING', message: 'Achetez plus de cartes pour continuer' }, { status: 402 })
     }
 
     // Generate unique card number
@@ -133,12 +140,18 @@ export async function POST(request: NextRequest) {
         cardNumber,
         qrCode: qrCodeDataUrl,
         isPaid: true,
-        paidAmount: 0,
-        paymentRef: 'free',
+        paidAmount: 10,
+        paymentRef: 'credit',
       },
       include: {
         member: { select: { id: true, firstName: true, lastName: true, photo: true, department: true } },
       },
+    })
+
+    // Decrement card credit
+    await db.cardCredit.update({
+      where: { userId: auth.userId },
+      data: { totalGenerated: { increment: 1 } },
     })
 
     return Response.json({ card }, { status: 201 })

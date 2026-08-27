@@ -5,6 +5,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { OneSignalProvider } from "@/components/mychurch/shared/onesignal-provider";
+import { AppShell } from "@/components/mychurch/shared/app-shell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,7 +57,9 @@ export default function RootLayout({
           themes={["light", "dark", "professional"]}
         >
           <OneSignalProvider>
-            {children}
+            <AppShell>
+              {children}
+            </AppShell>
             <Toaster />
           </OneSignalProvider>
         </ThemeProvider>

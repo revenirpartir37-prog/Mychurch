@@ -56,6 +56,12 @@ const config: Config = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		padding: {
+  			'safe-b': 'env(safe-area-inset-bottom)',
+  			'safe-t': 'env(safe-area-inset-top)',
+  			'safe-l': 'env(safe-area-inset-left)',
+  			'safe-r': 'env(safe-area-inset-right)',
   		}
   	}
   },

@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -14,17 +15,34 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import {
   CreditCard,
   Download,
   Printer,
-  Share2,
   QrCode,
-  Check,
   RotateCcw,
-  Copy,
+  ShoppingCart,
+  Minus,
+  Plus,
+  Loader2,
+  Check,
+  AlertCircle,
+  XCircle,
+  Clock,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { toast } from 'sonner'
+
+function formatUsd(amount: number) {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'USD' }).format(amount)
+}
 
 interface Member {
   id: string
@@ -49,6 +67,19 @@ interface CardData {
 
 interface ExistingCard extends CardData {}
 
+interface CardCredit {
+  remaining: number
+  totalPurchased: number
+  totalGenerated: number
+}
+
+interface PendingOrder {
+  id: string
+  quantity: number
+  totalPriceUsd: number
+  createdAt: string
+}
+
 export function MemberCardsPage() {
   const { auth } = useAppStore()
   const [members, setMembers] = useState<Member[]>([])
@@ -61,6 +92,19 @@ export function MemberCardsPage() {
   const [existingCards, setExistingCards] = useState<ExistingCard[]>([])
   const [cardsLoading, setCardsLoading] = useState(true)
 
+  // Credit state
+  const [credit, setCredit] = useState<CardCredit | null>(null)
+  const [creditLoading, setCreditLoading] = useState(true)
+
+  // Purchase dialog state
+  const [purchaseOpen, setPurchaseOpen] = useState(false)
+  const [purchaseQuantity, setPurchaseQuantity] = useState(1)
+  const [purchasing, setPurchasing] = useState(false)
+
+  // Pending orders state
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
+
   const selectedMember = useMemo(
     () => members.find((m) => m.id === selectedMemberId),
     [members, selectedMemberId],
@@ -70,8 +114,64 @@ export function MemberCardsPage() {
     ? `${selectedMember.firstName} ${selectedMember.lastName}`
     : ''
 
-  // Get church info from auth store
   const churchName = auth.churchName || 'MYCHURCH'
+
+  const fetchCredit = useCallback(async () => {
+    if (!auth.token) return
+    try {
+      const res = await fetch('/api/cards/credit', {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCredit(data)
+      }
+    } catch {
+      // silent
+    } finally {
+      setCreditLoading(false)
+    }
+  }, [auth.token])
+
+  const fetchPendingOrders = useCallback(async () => {
+    if (!auth.token) return
+    try {
+      const res = await fetch('/api/payments/pending-orders', {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPendingOrders(data.orders || [])
+      }
+    } catch {
+      // silent
+    }
+  }, [auth.token])
+
+  const handleCancelOrder = useCallback(async (orderId: string) => {
+    setCancellingId(orderId)
+    try {
+      const res = await fetch('/api/payments/cancel', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId }),
+      })
+      if (res.ok) {
+        toast.success('Commande annulée')
+        setPendingOrders((prev) => prev.filter((o) => o.id !== orderId))
+      } else {
+        const data = await res.json()
+        toast.error(data.error || "Erreur d'annulation")
+      }
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setCancellingId(null)
+    }
+  }, [auth.token])
 
   useEffect(() => {
     async function loadData() {
@@ -104,9 +204,29 @@ export function MemberCardsPage() {
     }
     if (auth.token) {
       loadData()
+      fetchCredit()
+      fetchPendingOrders()
     }
-  }, [auth.token, cardData])
+  }, [auth.token, fetchCredit, fetchPendingOrders])
 
+  // Handle payment success redirect
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const paymentStatus = params.get('payment')
+    const orderId = params.get('order')
+
+    if (paymentStatus === 'success' && orderId && auth.token) {
+      toast.success('Paiement confirmé ! Vos cartes ont été créditées.')
+      fetchCredit()
+      fetchPendingOrders()
+      // Clean URL
+      window.history.replaceState({}, '', '/?view=member-cards')
+    } else if (paymentStatus === 'error' && orderId) {
+      toast.error('Le paiement a échoué. Veuillez réessayer.')
+      window.history.replaceState({}, '', '/?view=member-cards')
+    }
+  }, [auth.token, fetchCredit, fetchPendingOrders])
 
   function handleMemberChange(memberId: string) {
     setSelectedMemberId(memberId)
@@ -116,6 +236,13 @@ export function MemberCardsPage() {
 
   async function handleGenerateCard() {
     if (!selectedMemberId) return
+
+    // Check credit first
+    if (credit && credit.remaining <= 0) {
+      setPurchaseOpen(true)
+      return
+    }
+
     setGenerating(true)
     try {
       const res = await fetch('/api/cards', {
@@ -130,14 +257,46 @@ export function MemberCardsPage() {
         const data = await res.json()
         setCardData(data.card)
         toast.success('Carte générée avec succès !')
+        fetchCredit()
       } else {
         const data = await res.json()
-        toast.error(data.error || 'Erreur de génération')
+        if (data.error === 'NO_CREDIT_REMAINING') {
+          setPurchaseOpen(true)
+        } else {
+          toast.error(data.error || 'Erreur de génération')
+        }
       }
     } catch {
       toast.error('Erreur de connexion')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  async function handlePurchaseCards() {
+    setPurchasing(true)
+    try {
+      const res = await fetch('/api/payments/card-bundle', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ quantity: purchaseQuantity }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl
+        }
+      } else {
+        const data = await res.json()
+        toast.error(data.error || "Erreur de paiement")
+      }
+    } catch {
+      toast.error('Erreur de connexion')
+    } finally {
+      setPurchasing(false)
     }
   }
 
@@ -159,7 +318,6 @@ export function MemberCardsPage() {
       const ctx = canvas.getContext('2d')
       if (!ctx) return
 
-      // Opaque White Background
       ctx.fillStyle = '#FFFFFF'
       ctx.fillRect(0, 0, width, totalHeight)
 
@@ -255,7 +413,6 @@ export function MemberCardsPage() {
       ctx.fillText('MEMBER CARD', cardX + cardWidth / 2, frontY + 540)
       ctx.restore()
 
-      // SEPARATION LINE (5mm)
       const lineY = frontY + cardHeight + gap / 2
       ctx.strokeStyle = '#CBD5E1'
       ctx.lineWidth = 2
@@ -328,7 +485,6 @@ export function MemberCardsPage() {
       ctx.fillText('Created by Henock Aduma', cardX + cardWidth - 40, footerY + 80)
       ctx.restore()
 
-      // Convert to Blob & trigger download
       canvas.toBlob((blob) => {
         if (!blob) {
           toast.error("Erreur de génération d'image")
@@ -365,6 +521,7 @@ export function MemberCardsPage() {
   }
 
   const [activeTab, setActiveTab] = useState<'generate' | 'list'>('generate')
+  const purchaseTotal = purchaseQuantity * 10
 
   return (
     <div className="space-y-6">
@@ -373,10 +530,78 @@ export function MemberCardsPage() {
         <div>
           <h1 className="text-2xl font-bold">Cartes de Membre</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Générez gratuitement une carte de membre pour chaque membre de votre église.
+            Générez des cartes de membre pour votre église.
           </p>
         </div>
+        {/* Credit badge */}
+        {!creditLoading && credit && (
+          <Card className="sm:w-auto">
+            <CardContent className="px-4 py-2 flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">
+                  {credit.remaining} carte{credit.remaining !== 1 ? 's' : ''} restante{credit.remaining !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <Separator orientation="vertical" className="h-5" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-8"
+                onClick={() => setPurchaseOpen(true)}
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                Acheter
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* Pending Orders Banner */}
+      {pendingOrders.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                  Paiement{pendingOrders.length > 1 ? 's' : ''} en cours
+                </p>
+                {pendingOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between gap-3 mt-2 py-2 border-t border-amber-200/50 dark:border-amber-800/50">
+                    <div className="min-w-0">
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        {order.quantity} carte{order.quantity !== 1 ? 's' : ''} — {formatUsd(order.totalPriceUsd)}
+                      </p>
+                      <p className="text-xs text-amber-600/70 dark:text-amber-400/70">
+                        Créée le {new Date(order.createdAt).toLocaleDateString('fr-FR')} à {new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-amber-700 dark:text-amber-300 hover:text-red-600 dark:hover:text-red-400 shrink-0"
+                      onClick={() => handleCancelOrder(order.id)}
+                      disabled={cancellingId === order.id}
+                    >
+                      {cancellingId === order.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5" />
+                      )}
+                      Annuler
+                    </Button>
+                  </div>
+                ))}
+                <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-2">
+                  Complétez le paiement ou annulez pour libérer la commande.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs Navigation */}
       <div className="flex border-b border-border gap-2">
@@ -441,8 +666,13 @@ export function MemberCardsPage() {
             >
               {generating ? (
                 <>
-                  <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Génération...
+                </>
+              ) : credit && credit.remaining <= 0 ? (
+                <>
+                  <ShoppingCart className="h-4 w-4" />
+                  Acheter des cartes
                 </>
               ) : (
                 <>
@@ -486,7 +716,6 @@ export function MemberCardsPage() {
             <CardContent>
               {cardData && selectedMember ? (
                 <div className="member-card-preview">
-                  {/* Flip container */}
                   <div
                     className="relative cursor-pointer"
                     style={{ perspective: '1000px' }}
@@ -509,28 +738,17 @@ export function MemberCardsPage() {
                         style={{ backfaceVisibility: 'hidden' }}
                       >
                         <div className="relative h-full bg-gradient-to-br from-blue-600 via-blue-800 to-blue-950 p-6 text-white flex flex-col justify-between">
-                          {/* Card background pattern - subtle diagonal lines */}
                           <div
                             className="absolute inset-0 opacity-[0.04]"
                             style={{
-                              backgroundImage: `repeating-linear-gradient(
-                                45deg,
-                                transparent,
-                                transparent 8px,
-                                rgba(255,255,255,0.5) 8px,
-                                rgba(255,255,255,0.5) 9px
-                              )`,
+                              backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.5) 8px, rgba(255,255,255,0.5) 9px)`,
                             }}
                           />
-
-                          {/* Decorative circles */}
                           <div className="absolute inset-0 overflow-hidden">
                             <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full bg-white/5" />
                             <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-white/5" />
                             <div className="absolute top-1/2 right-1/4 w-24 h-24 rounded-full bg-white/[0.03]" />
                           </div>
-
-                          {/* Shimmer/gloss sweep animation */}
                           <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
                             <div
                               className="absolute inset-0 animate-shimmer-sweep"
@@ -541,48 +759,25 @@ export function MemberCardsPage() {
                               }}
                             />
                           </div>
-
-                          {/* Top: Logo + Church name */}
                           <div className="relative z-10 flex flex-col items-center gap-2">
-                            <img
-                              src={auth.churchLogo || '/logo-mychurch.png'}
-                              alt="Church Logo"
-                              className="w-10 h-10 object-contain drop-shadow"
-                            />
-                            <span className="text-xs font-bold tracking-[0.3em] uppercase text-white/90">
-                              {churchName}
-                            </span>
+                            <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Church Logo" className="w-10 h-10 object-contain drop-shadow" />
+                            <span className="text-xs font-bold tracking-[0.3em] uppercase text-white/90">{churchName}</span>
                           </div>
-
-                          {/* Middle: Photo + Name */}
                           <div className="relative z-10 flex flex-col items-center gap-2.5">
                             <div className="h-20 w-20 rounded-full border-[3px] border-white/30 overflow-hidden shadow-lg">
                               {selectedMember.photo ? (
-                                <img
-                                  src={selectedMember.photo}
-                                  alt={memberName}
-                                  className="h-full w-full object-cover"
-                                />
+                                <img src={selectedMember.photo} alt={memberName} className="h-full w-full object-cover" />
                               ) : (
                                 <div className="h-full w-full bg-white/15 flex items-center justify-center text-2xl font-bold text-white/80">
-                                  {selectedMember.firstName[0]}
-                                  {selectedMember.lastName[0]}
+                                  {selectedMember.firstName[0]}{selectedMember.lastName[0]}
                                 </div>
                               )}
                             </div>
-                            <p className="text-xl font-bold tracking-wide text-center leading-tight">
-                              {memberName}
-                            </p>
-                            <p className="text-xs font-mono tracking-[0.2em] text-white/60 uppercase">
-                              {formatCardNumber(cardData.cardNumber)}
-                            </p>
+                            <p className="text-xl font-bold tracking-wide text-center leading-tight">{memberName}</p>
+                            <p className="text-xs font-mono tracking-[0.2em] text-white/60 uppercase">{formatCardNumber(cardData.cardNumber)}</p>
                           </div>
-
-                          {/* Bottom: MEMBER CARD */}
                           <div className="relative z-10 text-center">
-                            <p className="text-[10px] font-bold tracking-[0.35em] text-white/40 uppercase">
-                              Member Card
-                            </p>
+                            <p className="text-[10px] font-bold tracking-[0.35em] text-white/40 uppercase">Member Card</p>
                           </div>
                         </div>
                       </div>
@@ -590,45 +785,18 @@ export function MemberCardsPage() {
                       {/* BACK of card */}
                       <div
                         className="w-full aspect-[1.586/1] rounded-2xl overflow-hidden absolute inset-0"
-                        style={{
-                          backfaceVisibility: 'hidden',
-                          transform: 'rotateY(180deg)',
-                        }}
+                        style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                       >
                         <div className="relative h-full bg-white flex flex-col justify-between p-6">
-                          {/* Card background pattern on back */}
-                          <div
-                            className="absolute inset-0 opacity-[0.015] pointer-events-none"
-                            style={{
-                              backgroundImage: `repeating-linear-gradient(
-                                45deg,
-                                transparent,
-                                transparent 12px,
-                                rgba(0,0,0,0.8) 12px,
-                                rgba(0,0,0,0.8) 13px
-                              )`,
-                            }}
-                          />
-
-                          {/* Magnetic stripe */}
+                          <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(0,0,0,0.8) 12px, rgba(0,0,0,0.8) 13px)` }} />
                           <div className="absolute top-0 left-0 right-0 h-14 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900" />
-
-                          {/* Church info */}
                           <div className="mt-16 flex items-center gap-3">
-                            <img
-                              src={auth.churchLogo || '/logo-mychurch.png'}
-                              alt="Church Logo"
-                              className="h-10 w-10 object-contain rounded shadow-sm"
-                            />
+                            <img src={auth.churchLogo || '/logo-mychurch.png'} alt="Church Logo" className="h-10 w-10 object-contain rounded shadow-sm" />
                             <div>
-                              <p className="text-sm font-bold text-gray-900 tracking-wide">
-                                {churchName}
-                              </p>
+                              <p className="text-sm font-bold text-gray-900 tracking-wide">{churchName}</p>
                               <p className="text-xs text-gray-500">Kinshasa, RDC</p>
                             </div>
                           </div>
-
-                          {/* Member contact details on back */}
                           <div className="space-y-1.5 mt-3">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                               <div className="min-w-0">
@@ -646,50 +814,31 @@ export function MemberCardsPage() {
                               <div className="min-w-0">
                                 <p className="text-[9px] uppercase tracking-wider text-gray-400">Urgence</p>
                                 <p className="text-xs text-gray-700 font-medium truncate">
-                                  {[selectedMember.emergencyContactName, selectedMember.emergencyContactPhone]
-                                    .filter(Boolean)
-                                    .join(' · ') || '—'}
+                                  {[selectedMember.emergencyContactName, selectedMember.emergencyContactPhone].filter(Boolean).join(' · ') || '—'}
                                 </p>
                               </div>
                             </div>
                           </div>
-
-                          {/* QR Code + Creator */}
                           <div className="flex items-end justify-between mt-auto pt-3">
-                            {/* QR Code */}
                             <div className="flex items-center gap-3">
                               <div className="h-14 w-14 rounded-lg border-2 border-gray-200 bg-gray-50 flex items-center justify-center">
                                 {cardData.qrCode ? (
-                                  <img
-                                    src={cardData.qrCode}
-                                    alt="QR Code"
-                                    className="h-full w-full object-contain rounded-lg"
-                                  />
+                                  <img src={cardData.qrCode} alt="QR Code" className="h-full w-full object-contain rounded-lg" />
                                 ) : (
                                   <QrCode className="h-7 w-7 text-gray-300" />
                                 )}
                               </div>
                               <div>
-                                <p className="text-[10px] font-mono text-gray-400 tracking-wider">
-                                  {formatCardNumber(cardData.cardNumber)}
-                                </p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                  {new Date(cardData.createdAt).toLocaleDateString('fr-FR')}
-                                </p>
+                                <p className="text-[10px] font-mono text-gray-400 tracking-wider">{formatCardNumber(cardData.cardNumber)}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{new Date(cardData.createdAt).toLocaleDateString('fr-FR')}</p>
                               </div>
                             </div>
-
-                            {/* Creator signature */}
-                            <p className="text-[9px] text-gray-300 italic text-right leading-tight max-w-[120px]">
-                              Created by Henock Aduma
-                            </p>
+                            <p className="text-[9px] text-gray-300 italic text-right leading-tight max-w-[120px]">Created by Henock Aduma</p>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Click hint */}
                   <p className="text-xs text-muted-foreground text-center mt-3">
                     Cliquez sur la carte pour la retourner (Aperçu 3D)
                   </p>
@@ -705,7 +854,7 @@ export function MemberCardsPage() {
             </CardContent>
           </Card>
 
-          {/* Guide & Directives d'impression */}
+          {/* Guide */}
           <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
@@ -721,7 +870,7 @@ export function MemberCardsPage() {
               </p>
               <ol className="list-decimal list-inside space-y-1.5 font-medium text-foreground">
                 <li>Ouvrez le fichier <strong>carte_recto_verso.png</strong> sur votre appareil.</li>
-                <li>Imprimez-le via votre imprimante — cochez <strong>« Graphiques d&apos;arrière-plan »</strong> pour conserver les couleurs.</li>
+                <li>Imprimez-le via votre imprimante — cochez <strong>&laquo;&nbsp;Graphiques d&apos;arrière-plan&nbsp;&raquo;</strong> pour conserver les couleurs.</li>
                 <li>Découpez le Recto (partie haute) et le Verso (partie basse) puis assemblez-les.</li>
                 <li>Pour une carte plastifiée, plastifiez les deux faces assemblées.</li>
               </ol>
@@ -798,8 +947,97 @@ export function MemberCardsPage() {
         </div>
       )}
 
+      {/* ─── Purchase Dialog ─── */}
+      <Dialog open={purchaseOpen} onOpenChange={setPurchaseOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Acheter des cartes de membre
+            </DialogTitle>
+          </DialogHeader>
 
+          <div className="space-y-4">
+            {/* Current credit info */}
+            {credit && credit.totalPurchased > 0 && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm">
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                <span>
+                  Solde actuel : <strong>{credit.remaining}</strong> carte{credit.remaining !== 1 ? 's' : ''} restante{credit.remaining !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
 
+            {/* Quantity selector */}
+            <div className="space-y-2">
+              <Label>Nombre de cartes</Label>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  onClick={() => setPurchaseQuantity(Math.max(1, purchaseQuantity - 1))}
+                  disabled={purchaseQuantity <= 1}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={purchaseQuantity}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value)
+                    if (!isNaN(v) && v >= 1 && v <= 999) setPurchaseQuantity(v)
+                  }}
+                  className="text-center text-lg font-bold h-12"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  onClick={() => setPurchaseQuantity(Math.min(999, purchaseQuantity + 1))}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Price summary */}
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+              <div className="flex items-center justify-between text-sm text-muted-foreground mb-1">
+                <span>{purchaseQuantity} carte{purchaseQuantity !== 1 ? 's' : ''} × {formatUsd(10)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-bold">Total</span>
+                <span className="text-2xl font-bold text-primary">{formatUsd(purchaseTotal)}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-center">
+              Paiement sécurisé via GeniusPay (Wave, Orange Money, MTN, Moov, Visa/Mastercard)
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPurchaseOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={handlePurchaseCards}
+              disabled={purchasing || purchaseQuantity < 1}
+              className="gap-2"
+            >
+              {purchasing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CreditCard className="h-4 w-4" />
+              )}
+              Payer {formatUsd(purchaseTotal)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

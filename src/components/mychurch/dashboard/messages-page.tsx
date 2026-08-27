@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { EmptyState } from '@/components/mychurch/shared/empty-state'
 import { canSendMessages } from '@/lib/frontend-rbac'
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages'
 
 /* ─── Types ─── */
 
@@ -173,6 +174,7 @@ export function MessagesPage() {
 
   // Scroll ref for thread
   const threadEndRef = useRef<HTMLDivElement>(null)
+  const threadInputRef = useRef<HTMLTextAreaElement>(null)
 
   /* ─── Data fetching ─── */
 
@@ -291,14 +293,6 @@ export function MessagesPage() {
     )
   }, [allMessages, auth.userId])
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      fetchAllMessages()
-    }, 10000)
-
-    return () => window.clearInterval(intervalId)
-  }, [fetchAllMessages])
-
   /* ─── Filtered conversations ─── */
 
   const filteredConversations = useMemo(() => {
@@ -326,12 +320,40 @@ export function MessagesPage() {
 
   useEffect(() => {
     if (selectedConversation) {
-      // Small delay to let the DOM render
       setTimeout(() => {
         threadEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
     }
   }, [selectedConversation])
+
+  /* ─── Real-time messages via Supabase Realtime ─── */
+
+  useRealtimeMessages((newMsg) => {
+    const msg = newMsg as Message
+    setAllMessages((prev) => {
+      if (prev.some((m) => m.id === msg.id)) return prev
+      return [msg, ...prev]
+    })
+
+    if (selectedConversation && msg.senderId === selectedConversation.peerId) {
+      setSelectedConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              messages: [...prev.messages, msg],
+              lastMessage: new Date(msg.createdAt).getTime() > new Date(prev.lastMessage.createdAt).getTime() ? msg : prev.lastMessage,
+            }
+          : prev
+      )
+      setTimeout(() => {
+        threadEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } else {
+      toast.info(`Nouveau message de ${msg.sender?.firstName || 'Inconnu'}`, {
+        description: msg.content.length > 80 ? msg.content.substring(0, 80) + '...' : msg.content,
+      })
+    }
+  })
 
   /* ─── Select conversation ─── */
 
@@ -629,7 +651,7 @@ export function MessagesPage() {
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-muted/20">
+        <div className="chat-messages p-4 space-y-3 bg-muted/20">
           {selectedConversation.messages.map((msg, idx) => {
             const prevMsg = idx > 0 ? selectedConversation.messages[idx - 1] : null
             const showName = !prevMsg || prevMsg.senderId !== msg.senderId
@@ -646,14 +668,20 @@ export function MessagesPage() {
         </div>
 
         {/* Message input area */}
-        <div className="border-t border-border/50 bg-background p-3 shrink-0">
+        <div className="chat-input-bar border-t border-border/50 bg-background p-3">
           <div className="flex items-end gap-2">
             <Textarea
+              ref={threadInputRef}
               value={threadInput}
               onChange={(e) => setThreadInput(e.target.value)}
               placeholder="Écrire un message..."
               className="min-h-[40px] max-h-[120px] resize-none text-sm"
               rows={1}
+              onFocus={() => {
+                setTimeout(() => {
+                  threadInputRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+                }, 300)
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
@@ -704,8 +732,8 @@ export function MessagesPage() {
   /* ─── Main render ─── */
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
-      <div className="flex h-full border border-border/50 rounded-xl overflow-hidden bg-background">
+    <div className="flex flex-col h-[var(--app-height)]" style={{ height: 'var(--app-height, 100dvh)' }}>
+      <div className="flex flex-1 min-h-0 border border-border/50 rounded-xl overflow-hidden bg-background">
         {/* ─── Left panel: Conversation list ─── */}
         <div
           className={`w-full md:w-80 border-r border-border/50 flex flex-col shrink-0 bg-background ${
