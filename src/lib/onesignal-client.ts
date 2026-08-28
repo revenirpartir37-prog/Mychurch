@@ -31,14 +31,14 @@ let initPromise: Promise<OneSignalInstance | null> | null = null
 export type PushPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
 
 function loadScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if ((window as any).OneSignal) return resolve()
     const existing = document.getElementById('onesignal-sdk')
     if (existing) {
       existing.addEventListener('load', () => resolve())
       existing.addEventListener('error', () => {
         console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'SDK_LOAD_ERROR_EXISTING' }))
-        reject(new Error('OneSignal SDK load error'))
+        resolve()
       })
       return
     }
@@ -49,7 +49,7 @@ function loadScript(): Promise<void> {
     script.onload = () => resolve()
     script.onerror = () => {
       console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'SDK_LOAD_ERROR' }))
-      reject(new Error('OneSignal SDK load error'))
+      resolve()
     }
     document.body.appendChild(script)
   })
@@ -61,12 +61,7 @@ export function getOneSignal(): Promise<OneSignalInstance | null> {
   if (initPromise) return initPromise
 
   initPromise = (async () => {
-    try {
-      await loadScript()
-    } catch (e) {
-      console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'SDK_LOAD_FAILED', error: e instanceof Error ? e.message : String(e) }))
-      return null
-    }
+    await loadScript()
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
     if (!appId) {
       const msg = 'NEXT_PUBLIC_ONESIGNAL_APP_ID manquant — push désactivé'
