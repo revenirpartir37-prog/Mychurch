@@ -1,7 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { auth } from '@/firebase'
-import { signOut } from 'firebase/auth'
 import type { AppView, UserRole } from '@/lib/constants'
 
 interface AuthState {
@@ -80,9 +78,14 @@ export const useAppStore = create<AppState>()(
           },
         })),
       logout: () => {
-        if (auth) {
-          signOut(auth).catch((e) => console.warn('Firebase signOut failed:', e))
-        }
+        // Lazy firebase — évite d'inclure tout le SDK dans le chunk partagé initial
+        import('@/firebase').then(({ auth }) => {
+          if (auth) {
+            import('firebase/auth').then(({ signOut }) => {
+              signOut(auth).catch((e) => console.warn('Firebase signOut failed:', e))
+            })
+          }
+        })
         set({
           auth: initialAuth,
           currentView: 'landing',

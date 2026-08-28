@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useAppStore } from '@/store/app-store'
 import { getOneSignal, setPushUser, clearPushUser } from '@/lib/onesignal-client'
 
 // Associe l'utilisateur connecté à OneSignal pour des push ciblées.
@@ -18,6 +19,16 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void getOneSignal()
   }, [])
+
+  // Re-lie l'External ID après rehydratation Zustand (refresh page) ou changement d'user.
+  // Évite la chaîne cassée: subscribed mais pas loggé → push include_external_user_ids rate.
+  const userId = useAppStore((s) => s.auth.userId)
+  const isAuthenticated = useAppStore((s) => s.auth.isAuthenticated)
+  useEffect(() => {
+    if (isAuthenticated && userId) {
+      void setPushUser(userId)
+    }
+  }, [isAuthenticated, userId])
 
   return <>{children}</>
 }

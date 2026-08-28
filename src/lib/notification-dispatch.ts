@@ -56,17 +56,20 @@ export async function notifyUser({
   message,
   type = 'info',
   push = true,
-}) {
+}: NotifyUserPayload) {
   const notification = await db.notification.create({
     data: { churchId, userId, title, message, type },
   })
 
   if (push) {
-    await sendPushNotification({
+    const result = await sendPushNotification({
       title,
       message,
       userIds: [userId],
     })
+    if (!result.ok) {
+      console.warn(JSON.stringify({ scope: 'notification-dispatch', msg: 'PUSH_FAILED_NOTIFY_USER', reason: result.reason, userId, title }))
+    }
   }
 
   return notification
@@ -94,11 +97,14 @@ export async function notifyUsers({
   })
 
   if (!push) return
-  await sendPushNotification({
+  const result = await sendPushNotification({
     title,
     message,
     userIds: uniqueUserIds,
   })
+  if (!result.ok) {
+    console.warn(JSON.stringify({ scope: 'notification-dispatch', msg: 'PUSH_FAILED_NOTIFY_USERS', reason: result.reason, count: uniqueUserIds.length }))
+  }
 }
 
 export async function notifyChurchUsers({

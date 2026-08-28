@@ -31,18 +31,24 @@ export function useSupabaseRealtime(
           { event: '*', schema: 'public' },
           (payload) => {
             const table = payload.table as string
-            const record = payload.new as { churchId?: string } | null
+            const rec = (payload.new ?? (payload as any).old) as { churchId?: string } | null
             // Ne rafraîchir que si la table nous concerne
             if (tables.includes(table)) {
               // Si un filtre par église est fourni, ignorer les autres églises
-              if (filterChurchId && record?.churchId && record.churchId !== filterChurchId) {
+              if (filterChurchId && rec?.churchId && rec.churchId !== filterChurchId) {
                 return
               }
               onChangeRef.current()
             }
           }
         )
-        .subscribe()
+        .subscribe((status, err) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(JSON.stringify({ scope: 'realtime', msg: 'CHANNEL_ERROR', status, err: err ? String(err) : undefined, tables }))
+            // Fallback: forcer un refetch immédiat si le canal tombe
+            onChangeRef.current()
+          }
+        })
     }
 
     return () => {

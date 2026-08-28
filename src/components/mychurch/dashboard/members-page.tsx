@@ -165,7 +165,7 @@ export function MembersPage() {
   const fetchDepartments = useCallback(async () => {
     setLoadingDeps(true)
     try {
-      const res = await fetch('/api/members?limit=999', {
+      const res = await fetch('/api/members?limit=100', {
         headers: { 'Authorization': `Bearer ${auth.token}` },
       })
       if (res.ok) {

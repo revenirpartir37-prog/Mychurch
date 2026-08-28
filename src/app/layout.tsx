@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" suppressHydrationWarning className="dark">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/logo-mychurch.png" />
         <Script src="/register-sw.js" strategy="afterInteractive" />

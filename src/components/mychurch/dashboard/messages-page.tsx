@@ -42,6 +42,7 @@ interface MessageSender {
   lastName: string
   photo?: string | null
   role?: string | null
+  function?: string | null
 }
 
 interface Message {
@@ -71,7 +72,9 @@ interface MemberOption {
   lastName: string
   photo?: string | null
   role?: string | null
-  department?: string | null
+  function?: string | null
+  email?: string | null
+  department?: string | null // legacy Member field, gardé pour compatibilité
 }
 
 /* ─── Avatar color palette based on first letter ─── */
@@ -181,12 +184,12 @@ export function MessagesPage() {
   const fetchAllMessages = useCallback(async () => {
     setLoading(true)
     try {
-      // Fetch inbox (received, non-archived)
+      // Pagination 50 max côté API — évite limit=999 qui charge tout à l'échelle
       const [inboxRes, sentRes] = await Promise.all([
-        fetch('/api/messages?folder=inbox&limit=999', {
+        fetch('/api/messages?folder=inbox&limit=50', {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
-        fetch('/api/messages?folder=sent&limit=999', {
+        fetch('/api/messages?folder=sent&limit=50', {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
       ])
@@ -223,9 +226,8 @@ export function MessagesPage() {
 
   const fetchMembers = useCallback(async () => {
     try {
-      // Recipients are app users (admin / treasurer / secretary / reader) in the same church,
-      // not church members/personnel.
-      const res = await fetch('/api/users-management?limit=999', {
+      // Cap 50 — users-management API plafonne à 100
+      const res = await fetch('/api/users-management?limit=50', {
         headers: { Authorization: `Bearer ${auth.token}` },
       })
       if (res.ok) {
@@ -239,13 +241,10 @@ export function MessagesPage() {
     }
   }, [auth.token])
 
+  // Fusion des 2 fetchs en un seul état de chargement — évite double skeleton waterfall
   useEffect(() => {
-    fetchAllMessages()
-  }, [fetchAllMessages])
-
-  useEffect(() => {
-    fetchMembers()
-  }, [fetchMembers])
+    void Promise.all([fetchAllMessages(), fetchMembers()])
+  }, [fetchAllMessages, fetchMembers])
 
   /* ─── Build conversations from messages ─── */
 
@@ -304,7 +303,7 @@ export function MessagesPage() {
     })
   }, [conversations, searchQuery])
 
-  /* ─── Filtered members for compose ─── */
+  /* ─── Filtered members for compose — inclut role/function/email ─── */
 
   const filteredMembers = useMemo(() => {
     const q = composeSearch.toLowerCase().trim()
@@ -312,7 +311,10 @@ export function MessagesPage() {
     return members.filter(
       (m) =>
         m.firstName.toLowerCase().includes(q) ||
-        m.lastName.toLowerCase().includes(q)
+        m.lastName.toLowerCase().includes(q) ||
+        (m.role && m.role.toLowerCase().includes(q)) ||
+        (m.function && m.function.toLowerCase().includes(q)) ||
+        (m.email && m.email.toLowerCase().includes(q))
     )
   }, [members, composeSearch])
 
@@ -326,9 +328,17 @@ export function MessagesPage() {
     }
   }, [selectedConversation])
 
-  /* ─── Real-time messages via Supabase Realtime ─── */
+  /* ─── Real-time messages via Supabase Realtime + fallback polling 60s ─── */
+  const [realtimeOk, setRealtimeOk] = useState(false)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (!realtimeOk) void fetchAllMessages()
+    }, 60000)
+    return () => window.clearInterval(id)
+  }, [realtimeOk, fetchAllMessages])
 
   useRealtimeMessages((newMsg) => {
+    setRealtimeOk(true)
     const msg = newMsg as Message
     setAllMessages((prev) => {
       if (prev.some((m) => m.id === msg.id)) return prev
@@ -827,7 +837,7 @@ export function MessagesPage() {
               <Input
                 value={composeSearch}
                 onChange={(e) => setComposeSearch(e.target.value)}
-                placeholder="Rechercher un membre..."
+                placeholder="Rechercher (nom, rôle, fonction, email)..."
                 className="text-sm"
               />
 
@@ -845,8 +855,10 @@ export function MessagesPage() {
                             {initials}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium flex-1">
+                        <span className="text-sm font-medium flex-1 flex items-center gap-1.5">
                           {member.firstName} {member.lastName}
+                          {member.role && <span className="rounded bg-primary/20 px-1 py-0 text-[10px] font-medium text-primary">{member.role}</span>}
+                          {member.function && <span className="text-[11px] text-muted-foreground truncate">{member.function}</span>}
                         </span>
                         <Button
                           variant="ghost"
@@ -879,15 +891,15 @@ export function MessagesPage() {
                               {initials}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm truncate">
                               {m.firstName} {m.lastName}
                             </p>
-                            {m.department && (
-                              <p className="text-[11px] text-muted-foreground truncate">
-                                {m.department}
-                              </p>
-                            )}
+                            <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1">
+                              {m.role && <span className="inline-flex items-center rounded bg-primary/10 px-1 py-0 text-[10px] font-medium text-primary">{m.role}</span>}
+                              {m.function && <span className="truncate">{m.function}</span>}
+                              {!m.role && !m.function && m.department && <span>{m.department}</span>}
+                            </p>
                           </div>
                         </button>
                       )

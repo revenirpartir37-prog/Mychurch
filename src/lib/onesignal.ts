@@ -12,11 +12,23 @@ export interface PushContent {
   segments?: string[]     // ex. ['Subscribed Users'] / ['Active Users']
 }
 
-// Envoie une push via l'API OneSignal. Ne jamais lancer : si la clé manque, on skip.
-export async function sendPushNotification(content: PushContent): Promise<boolean> {
+export type PushResult = { ok: true } | { ok: false; reason: string; status?: number }
+
+function logPush(level: 'warn' | 'error', msg: string, meta?: Record<string, unknown>) {
+  const payload = JSON.stringify({ scope: 'onesignal:push', msg, ...meta, ts: new Date().toISOString() })
+  if (level === 'warn') console.warn(payload)
+  else console.error(payload)
+}
+
+// Envoie une push via l'API OneSignal. Ne jamais throw côté appelant sauf config manquante en dev.
+// Retourne un résultat explicite pour que l'appelant puisse logger/monitorer.
+export async function sendPushNotification(content: PushContent): Promise<PushResult> {
   const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
   const apiKey = process.env.ONESIGNAL_REST_API_KEY
-  if (!appId || !apiKey) return false
+  if (!appId || !apiKey) {
+    logPush('warn', 'ONESIGNAL_CONFIG_MISSING_SKIP', { hasAppId: !!appId, hasApiKey: !!apiKey })
+    return { ok: false, reason: 'ONESIGNAL_CONFIG_MISSING' }
+  }
 
   const body: Record<string, unknown> = {
     app_id: appId,
@@ -34,22 +46,28 @@ export async function sendPushNotification(content: PushContent): Promise<boolea
     body.included_segments = ['Total Subscriptions']
   }
 
-  try {
-    const res = await fetch(ONESIGNAL_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) {
-      console.error(`OneSignal push failed (${res.status}):`, await res.text())
-      return false
+  // Retry exponentiel 3 tentatives (500ms, 1s, 2s) — évite échec silencieux sous charge
+  let lastErr: PushResult = { ok: false, reason: 'UNKNOWN' }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(ONESIGNAL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Basic ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) return { ok: true }
+      const text = await res.text()
+      lastErr = { ok: false, reason: `HTTP_${res.status}`, status: res.status }
+      logPush('error', 'ONESIGNAL_PUSH_FAILED', { attempt: attempt + 1, status: res.status, body: text.slice(0, 500), userIds: content.userIds?.length ?? 0 })
+      if (res.status >= 400 && res.status < 500) break // 4xx non retryable
+    } catch (e) {
+      lastErr = { ok: false, reason: 'EXCEPTION' }
+      logPush('error', 'ONESIGNAL_PUSH_EXCEPTION', { attempt: attempt + 1, error: e instanceof Error ? e.message : String(e) })
     }
-    return true
-  } catch (e) {
-    console.error('OneSignal push error:', e)
-    return false
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)))
   }
+  return lastErr
 }

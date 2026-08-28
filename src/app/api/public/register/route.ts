@@ -1,24 +1,28 @@
 import { db } from '@/lib/db'
 import { z } from 'zod'
+import { notifyChurchUsers } from '@/lib/notification-dispatch'
+import { rateLimit, getClientKey } from '@/lib/rate-limit'
 
 const publicRegisterSchema = z.object({
   slug: z.string().min(1),
   firstName: z.string().min(1, 'Le prénom est requis'),
   lastName: z.string().min(1, 'Le nom est requis'),
-  type: z.enum(['member', 'personnel']).optional(),
-  phone: z.string().optional().nullable(),
+  type: z.enum(['member', 'personnel']),
+  phone: z.string().min(1, 'Le téléphone est requis'),
   email: z.string().email('Email invalide').optional().nullable().or(z.literal('')),
-  address: z.string().optional().nullable(),
-  department: z.string().optional().nullable(),
-  function: z.string().optional().nullable(),
-  emergencyContactName: z.string().optional().nullable(),
-  emergencyContactPhone: z.string().optional().nullable(),
+  address: z.string().min(1, 'L\'adresse est requise'),
+  department: z.string().min(1, 'Le département est requis'),
+  function: z.string().min(1, 'La fonction est requise'),
+  emergencyContactName: z.string().min(1, 'Le contact d\'urgence (nom) est requis'),
+  emergencyContactPhone: z.string().min(1, 'Le téléphone d\'urgence est requis'),
   photo: z.string().optional().nullable(),
 })
 
 // POST /api/public/register
 // Public self-registration for members via the church's unique link.
 export async function POST(request: Request) {
+  const rl = rateLimit(`public-register:${getClientKey(request)}`, 10, 60_000)
+  if (!rl.ok) return Response.json({ error: 'Trop de requêtes, réessayez dans quelques secondes' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) } })
   try {
     const body = await request.json()
     const data = publicRegisterSchema.parse(body)
@@ -36,18 +40,28 @@ export async function POST(request: Request) {
         churchId: church.id,
         firstName: data.firstName,
         lastName: data.lastName,
-        type: data.type || 'member',
-        phone: data.phone || null,
+        type: data.type,
+        phone: data.phone,
         email: data.email || null,
-        address: data.address || null,
-        department: data.department || null,
-        function: data.function || null,
-        emergencyContactName: data.emergencyContactName || null,
-        emergencyContactPhone: data.emergencyContactPhone || null,
+        address: data.address,
+        department: data.department,
+        function: data.function,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactPhone: data.emergencyContactPhone,
         photo: data.photo || null,
         status: 'active',
       },
     })
+
+    // Notifie les admins de la nouvelle inscription (non bloquant)
+    notifyChurchUsers({
+      churchId: church.id,
+      title: 'Nouvelle inscription',
+      message: `${data.firstName} ${data.lastName} (${data.type}) vient de s'inscrire via le lien public.`,
+      type: 'info',
+      push: true,
+      roles: ['admin', 'secretary'],
+    }).catch((e) => console.warn('notifyChurchUsers public register failed:', e))
 
     return Response.json({ success: true, member }, { status: 201 })
   } catch (error) {

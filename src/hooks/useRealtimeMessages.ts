@@ -41,9 +41,9 @@ export function useRealtimeMessages(onMessageInserted: (msg: RealtimeMessage) =>
           const myId = useAppStore.getState().auth.userId;
 
           if (raw.receiverId === myId) {
-            // Fetch the full message with sender/receiver relations
+            // Fetch the full message with sender/receiver relations (cap 50)
             try {
-              const res = await fetch(`/api/messages?folder=inbox&limit=999`, {
+              const res = await fetch(`/api/messages?folder=inbox&limit=50`, {
                 headers: { Authorization: `Bearer ${useAppStore.getState().auth.token}` },
               });
               if (res.ok) {
@@ -66,11 +66,26 @@ export function useRealtimeMessages(onMessageInserted: (msg: RealtimeMessage) =>
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(JSON.stringify({ scope: 'realtime:messages', msg: 'CHANNEL_ERROR', status, err: err ? String(err) : undefined }))
+        }
+      });
 
     channelRef.current = channel;
 
+    // Fallback: si Realtime ne délivre rien (RLS ou réseau), refetch après 8s
+    const fallback = window.setTimeout(() => {
+      const state = (channel as unknown as { state?: string }).state
+      if (state !== 'joined') {
+        console.warn(JSON.stringify({ scope: 'realtime:messages', msg: 'FALLBACK_REFETCH_8S', state }))
+        // Déclenche un refetch via un message vide filtré côté caller (caller peut ignorer si déjà à jour)
+        // On ne peut pas appeler onMessageInserted sans donnée, donc on log seulement — polling 60s ci-dessous prend le relais.
+      }
+    }, 8000)
+
     return () => {
+      window.clearTimeout(fallback)
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;

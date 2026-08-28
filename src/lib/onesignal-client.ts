@@ -31,12 +31,15 @@ let initPromise: Promise<OneSignalInstance | null> | null = null
 export type PushPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
 
 function loadScript(): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if ((window as any).OneSignal) return resolve()
     const existing = document.getElementById('onesignal-sdk')
     if (existing) {
       existing.addEventListener('load', () => resolve())
-      existing.addEventListener('error', () => resolve())
+      existing.addEventListener('error', () => {
+        console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'SDK_LOAD_ERROR_EXISTING' }))
+        reject(new Error('OneSignal SDK load error'))
+      })
       return
     }
     const script = document.createElement('script')
@@ -44,7 +47,10 @@ function loadScript(): Promise<void> {
     script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'
     script.async = true
     script.onload = () => resolve()
-    script.onerror = () => resolve()
+    script.onerror = () => {
+      console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'SDK_LOAD_ERROR' }))
+      reject(new Error('OneSignal SDK load error'))
+    }
     document.body.appendChild(script)
   })
 }
@@ -55,9 +61,19 @@ export function getOneSignal(): Promise<OneSignalInstance | null> {
   if (initPromise) return initPromise
 
   initPromise = (async () => {
-    await loadScript()
+    try {
+      await loadScript()
+    } catch (e) {
+      console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'SDK_LOAD_FAILED', error: e instanceof Error ? e.message : String(e) }))
+      return null
+    }
     const appId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
-    if (!appId) return null
+    if (!appId) {
+      const msg = 'NEXT_PUBLIC_ONESIGNAL_APP_ID manquant — push désactivé'
+      console.warn(JSON.stringify({ scope: 'onesignal:client', msg }))
+      if (process.env.NODE_ENV === 'development') console.warn(msg)
+      return null
+    }
 
     const w = window as any
     w.OneSignalDeferred = w.OneSignalDeferred || []
@@ -117,10 +133,18 @@ export async function requestPushPermission(): Promise<void> {
 // Associe l'utilisateur (id Supabase) à l'abonnement push.
 export async function setPushUser(userId: string): Promise<void> {
   const os = await getOneSignal()
+  if (!os) {
+    console.warn(JSON.stringify({ scope: 'onesignal:client', msg: 'SET_PUSH_USER_NO_OS', userId }))
+    return
+  }
+  const subscribed = await isSubscribed()
+  if (!subscribed) {
+    console.warn(JSON.stringify({ scope: 'onesignal:client', msg: 'SET_PUSH_USER_NOT_SUBSCRIBED', userId }))
+  }
   try {
     await os?.login?.(userId)
   } catch (error) {
-    console.error('OneSignal login error:', error)
+    console.error(JSON.stringify({ scope: 'onesignal:client', msg: 'LOGIN_ERROR', userId, error: error instanceof Error ? error.message : String(error) }))
   }
 }
 

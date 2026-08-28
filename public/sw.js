@@ -33,6 +33,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
   if (request.url.includes('/api/')) return
+  // Ne jamais intercepter le SDK/worker OneSignal
+  if (request.url.includes('OneSignal') || request.url.includes('onesignal.com')) return
 
   event.respondWith(
     fetch(request)

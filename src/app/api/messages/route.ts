@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { notifyUser } from '@/lib/notification-dispatch'
+import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -34,8 +35,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const folder = searchParams.get('folder') || 'inbox'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20')))
 
     const where: Record<string, unknown> = { churchId: auth.churchId }
 
@@ -57,8 +58,8 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          sender: { select: { id: true, firstName: true, lastName: true } },
-          receiver: { select: { id: true, firstName: true, lastName: true } },
+          sender: { select: { id: true, firstName: true, lastName: true, role: true, function: true } },
+          receiver: { select: { id: true, firstName: true, lastName: true, role: true, function: true } },
         },
       }),
       db.message.count({ where }),
@@ -82,6 +83,10 @@ export async function GET(request: NextRequest) {
 // POST: Send message
 export async function POST(request: NextRequest) {
   try {
+    const token = request.headers.get('authorization')?.replace('Bearer ', '') || ''
+    const rlKey = token ? `msg:${token.slice(-12)}` : `msg:${request.headers.get('x-forwarded-for') || 'anon'}`
+    const rl = rateLimit(rlKey, 20, 60_000)
+    if (!rl.ok) return Response.json({ error: 'Trop de messages, patientez' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) } })
     const auth = await getAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
@@ -107,8 +112,8 @@ export async function POST(request: NextRequest) {
         content: data.content,
       },
       include: {
-        sender: { select: { id: true, firstName: true, lastName: true } },
-        receiver: { select: { id: true, firstName: true, lastName: true } },
+        sender: { select: { id: true, firstName: true, lastName: true, role: true, function: true } },
+        receiver: { select: { id: true, firstName: true, lastName: true, role: true, function: true } },
       },
     })
 
@@ -164,8 +169,8 @@ export async function PUT(request: NextRequest) {
       where: { id: data.id },
       data: updateData,
       include: {
-        sender: { select: { id: true, firstName: true, lastName: true } },
-        receiver: { select: { id: true, firstName: true, lastName: true } },
+        sender: { select: { id: true, firstName: true, lastName: true, role: true, function: true } },
+        receiver: { select: { id: true, firstName: true, lastName: true, role: true, function: true } },
       },
     })
 

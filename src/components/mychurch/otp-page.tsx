@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Loader2, ArrowLeft, ShieldCheck } from 'lucide-react'
 import type { UserRole } from '@/lib/constants'
 import { upsertFirestoreUser, deleteFirestoreOtp } from '@/firebase'
+import { onesignalLogin } from '@/components/mychurch/shared/onesignal-provider'
 
 export function OtpPage() {
   const { pendingOtpEmail, setCurrentView, setAuth } = useAppStore()
@@ -151,6 +152,7 @@ export function OtpPage() {
           isAuthenticated: true,
           verified: true,
         })
+        onesignalLogin(result.user.id)
         toast.success('Email vérifié ! Bienvenue sur votre dashboard 🎉')
         setCurrentView('dashboard')
       } else {

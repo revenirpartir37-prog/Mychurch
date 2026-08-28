@@ -67,6 +67,8 @@ model User {
   auditLogs  AuditLog[]
 
   @@unique([churchId, email])
+  @@index([churchId, role])
+  @@index([churchId, isActive])
 }
 
 // ==================== MEMBER ====================
@@ -94,6 +96,9 @@ model Member {
   attendance  Attendance[]
   memberCards MemberCard[]
   transactions Transaction[] @relation("MemberTransactions")
+
+  @@index([churchId, status])
+  @@index([churchId, type])
 }
 
 // ==================== TRANSACTION ====================
@@ -118,6 +123,9 @@ model Transaction {
 
   church   Church  @relation(fields: [churchId], references: [id])
   member   Member? @relation("MemberTransactions", fields: [memberId], references: [id])
+
+  @@index([churchId, date])
+  @@index([churchId, type, category])
 }
 
 // ==================== EVENT ====================
@@ -152,6 +160,10 @@ model Attendance {
   church Church @relation(fields: [churchId], references: [id])
   event  Event?  @relation(fields: [eventId], references: [id])
   member Member  @relation(fields: [memberId], references: [id])
+
+  @@index([churchId, memberId])
+  @@index([eventId])
+  @@index([churchId, date])
 }
 
 // ==================== MESSAGE ====================
@@ -170,6 +182,10 @@ model Message {
   church   Church @relation(fields: [churchId], references: [id])
   sender   User   @relation("SentMessages", fields: [senderId], references: [id])
   receiver User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@index([churchId, receiverId, createdAt])
+  @@index([churchId, senderId, createdAt])
+  @@index([churchId, isArchived])
 }
 
 // ==================== NOTIFICATION ====================
@@ -184,6 +200,10 @@ model Notification {
   createdAt DateTime @default(now())
 
   church Church @relation(fields: [churchId], references: [id])
+
+  @@index([churchId, userId, isRead])
+  @@index([userId, isRead])
+  @@index([churchId, createdAt])
 }
 
 // ==================== MEMBER CARD ====================
@@ -262,6 +282,8 @@ model AuditLog {
 
   church Church @relation(fields: [churchId], references: [id])
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, createdAt])
 }
 
 // ==================== ARCHIVE ====================
@@ -322,6 +344,8 @@ model CardOrder {
   status          String   @default("pending") // pending, completed, failed, expired
   createdAt       DateTime @default(now())
   completedAt     DateTime?
+
+  @@index([userId, status])
 }
 
 // ==================== CARD CREDIT ====================

@@ -50,8 +50,6 @@ import {
   Legend,
 } from 'recharts'
 import { REVENUE_LABELS, EXPENSE_LABELS } from '@/lib/constants'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 interface Transaction {
   id: string
@@ -117,13 +115,13 @@ export function ReportsPage() {
     setLoading(true)
     try {
       const [fRes, mRes, aRes] = await Promise.all([
-        fetch('/api/finances?limit=1000', {
+        fetch('/api/finances?limit=100', {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
-        fetch('/api/members?limit=1000', {
+        fetch('/api/members?limit=100', {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
-        fetch('/api/attendance?limit=1000', {
+        fetch('/api/attendance?limit=100', {
           headers: { Authorization: `Bearer ${auth.token}` },
         }),
       ])
@@ -271,6 +269,10 @@ export function ReportsPage() {
   }
 
   async function generatePDF() {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
 

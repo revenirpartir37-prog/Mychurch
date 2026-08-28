@@ -9,6 +9,7 @@ import { CURRENCY_LABELS, CREATOR } from '@/lib/constants'
 import { toast } from 'sonner'
 import { upsertFirestoreUser, auth as firebaseAuth, firebaseAvailable } from '@/firebase'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { onesignalLogin } from '@/components/mychurch/shared/onesignal-provider'
 import {
   Card,
   CardContent,
@@ -210,6 +211,7 @@ export function RegisterPage() {
         verified: true,
         firebaseUid: uid,
       })
+      onesignalLogin(result.user.id)
       toast.success(`Bienvenue ! Votre église "${result.church.name}" a été créée avec succès.`)
       setCurrentView('dashboard')
     } catch {

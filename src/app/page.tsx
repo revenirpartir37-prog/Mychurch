@@ -146,12 +146,7 @@ export default function Home() {
     // Don't clean URL here - child components read ?payment= param
   }, [auth.isAuthenticated, setCurrentView])
 
-  // Register service worker for PWA
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
-    }
-  }, [])
+  // Service worker enregistré une seule fois via layout.tsx -> /register-sw.js
 
   // Unauthenticated views
   if (currentView === 'landing') return <LandingPage />

@@ -12,8 +12,22 @@ import { toast } from 'sonner'
 import { Bell, X, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+const DISMISS_KEY = 'mychurch:notifyDismissedAt'
+const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 jours
+
+function isDismissedRecently(): boolean {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY)
+    if (!raw) return false
+    const ts = Number(raw)
+    return Number.isFinite(ts) && Date.now() - ts < DISMISS_TTL_MS
+  } catch {
+    return false
+  }
+}
+
 // Demande d'autorisation des notifications push à la première connexion / inscription.
-// S'affiche à chaque ouverture tant que l'utilisateur n'a pas accepté (abonnement actif).
+// S'affiche tant que l'utilisateur n'a pas accepté, avec cooldown 7j après "Plus tard".
 export function NotificationsPrompt() {
   const isAuthenticated = useAppStore((s) => s.auth.isAuthenticated)
   const [visible, setVisible] = useState(false)
@@ -22,7 +36,16 @@ export function NotificationsPrompt() {
   const checkSubscription = useCallback(async () => {
     const subscribed = await isSubscribed()
     setChecking(false)
-    setVisible(!subscribed)
+    if (subscribed) {
+      try { localStorage.removeItem(DISMISS_KEY) } catch {}
+      setVisible(false)
+      return
+    }
+    if (isDismissedRecently()) {
+      setVisible(false)
+      return
+    }
+    setVisible(true)
   }, [])
 
   useEffect(() => {
@@ -55,6 +78,7 @@ export function NotificationsPrompt() {
   }
 
   function handleDismiss() {
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now())) } catch {}
     setVisible(false)
   }
 

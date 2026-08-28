@@ -103,9 +103,21 @@ export default function JoinPage() {
   }
 
   const handleSubmit = async () => {
-    if (!form.firstName || !form.lastName) {
-      toast.error('Le prénom et le nom sont obligatoires')
-      return
+    const required: [string, string][] = [
+      ['firstName', 'Le prénom est requis'],
+      ['lastName', 'Le nom est requis'],
+      ['phone', 'Le téléphone est requis'],
+      ['address', "L'adresse est requise"],
+      ['department', 'Le département est requis'],
+      ['function', 'La fonction est requise'],
+      ['emergencyContactName', "Le nom du contact d'urgence est requis"],
+      ['emergencyContactPhone', "Le téléphone d'urgence est requis"],
+    ]
+    for (const [key, msg] of required) {
+      if (!(form as any)[key]?.trim()) {
+        toast.error(msg)
+        return
+      }
     }
     setSubmitting(true)
     try {
@@ -118,7 +130,8 @@ export default function JoinPage() {
         setDone(true)
       } else {
         const err = await res.json()
-        toast.error(err.error || 'Erreur lors de l\'inscription')
+        const details = err.details?.[0]?.message
+        toast.error(details || err.error || 'Erreur lors de l\'inscription')
       }
     } catch {
       toast.error('Erreur de connexion')
@@ -376,23 +389,23 @@ export default function JoinPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Téléphone</Label>
+              <Label className="text-xs">Téléphone *</Label>
               <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+243 ..." className="h-10" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Email</Label>
+              <Label className="text-xs">Email <span className="text-muted-foreground font-normal">(optionnel)</span></Label>
               <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@exemple.com" className="h-10" />
             </div>
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs">Adresse</Label>
+            <Label className="text-xs">Adresse *</Label>
             <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Adresse complète" className="h-10" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">{form.type === 'personnel' ? 'Fonction' : 'Département'}</Label>
+              <Label className="text-xs">{form.type === 'personnel' ? 'Fonction *' : 'Département *'}</Label>
               <Input
                 value={form.type === 'personnel' ? form.function : form.department}
                 onChange={(e) => setForm(
@@ -403,7 +416,7 @@ export default function JoinPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">{form.type === 'personnel' ? 'Département' : 'Fonction'}</Label>
+              <Label className="text-xs">{form.type === 'personnel' ? 'Département *' : 'Fonction *'}</Label>
               <Input
                 value={form.type === 'personnel' ? form.department : form.function}
                 onChange={(e) => setForm(
@@ -417,14 +430,14 @@ export default function JoinPage() {
 
           {/* Emergency contact */}
           <div className="rounded-lg border bg-muted/10 p-3 space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">Contact en cas d'urgence</p>
+            <p className="text-xs font-medium text-muted-foreground">Contact en cas d'urgence *</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Nom</Label>
+                <Label className="text-xs">Nom *</Label>
                 <Input value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.target.value })} placeholder="Nom" className="h-10" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Téléphone</Label>
+                <Label className="text-xs">Téléphone *</Label>
                 <Input value={form.emergencyContactPhone} onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })} placeholder="+243 ..." className="h-10" />
               </div>
             </div>
