@@ -606,117 +606,81 @@ export function MessagesPage() {
     )
   }
 
-  /* ─── Render: Thread panel ─── */
-
-  function ThreadPanel() {
-    if (!selectedConversation) {
+  /* ─── Thread panel — inline JSX (pas de function interne) pour éviter le remount qui faisait perdre le focus à chaque lettre ─── */
+  const threadPanelContent = !selectedConversation ? (
+    <div className="flex-1 flex items-center justify-center">
+      <EmptyState
+        icon={Mail}
+        title="Sélectionnez une conversation"
+        description="Choisissez une conversation dans la liste pour commencer à discuter"
+      />
+    </div>
+  ) : (
+    (() => {
+      const peer = selectedConversation.peer
+      const peerInitials = `${peer.firstName[0]}${peer.lastName[0]}`
+      const avatarColor = getAvatarColor(peer.firstName + peer.lastName)
       return (
-        <div className="flex-1 flex items-center justify-center">
-          <EmptyState
-            icon={Mail}
-            title="Sélectionnez une conversation"
-            description="Choisissez une conversation dans la liste pour commencer à discuter"
-          />
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Thread header */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-background shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-8 w-8"
+              onClick={() => {
+                setShowMobileThread(false)
+                setSelectedConversation(null)
+              }}
+              aria-label="Retour"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <Avatar className="h-9 w-9">
+              {peer.photo && <AvatarImage src={peer.photo} alt={peer.firstName} />}
+              <AvatarFallback className={`text-xs font-semibold ${avatarColor}`}>{peerInitials}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">{peer.firstName} {peer.lastName}</p>
+              {peer.role && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 mt-0.5">{peer.role}</Badge>}
+            </div>
+          </div>
+          <div className="chat-messages p-4 space-y-3 bg-muted/20">
+            {selectedConversation.messages.map((msg, idx) => {
+              const prevMsg = idx > 0 ? selectedConversation.messages[idx - 1] : null
+              const showName = !prevMsg || prevMsg.senderId !== msg.senderId
+              return <MessageBubble key={msg.id} message={msg} showName={showName} prevSenderId={prevMsg?.senderId ?? null} />
+            })}
+            <div ref={threadEndRef} />
+          </div>
+          <div className="chat-input-bar border-t border-border/50 bg-background p-3">
+            <div className="flex items-end gap-2">
+              <Textarea
+                ref={threadInputRef}
+                value={threadInput}
+                onChange={(e) => setThreadInput(e.target.value)}
+                placeholder="Écrire un message..."
+                className="min-h-[40px] max-h-[120px] resize-none text-sm"
+                rows={1}
+                onFocus={() => {
+                  setTimeout(() => threadEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 300)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendThreadMessage()
+                  }
+                }}
+              />
+              <Button size="icon" className="h-10 w-10 shrink-0 rounded-xl" onClick={handleSendThreadMessage} disabled={!threadInput.trim() || sendingThread} aria-label="Envoyer">
+                {sendingThread ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
         </div>
       )
-    }
-
-    const peer = selectedConversation.peer
-    const peerInitials = `${peer.firstName[0]}${peer.lastName[0]}`
-    const avatarColor = getAvatarColor(peer.firstName + peer.lastName)
-
-    return (
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Thread header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50 bg-background shrink-0">
-          {/* Mobile back button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden h-8 w-8"
-            onClick={() => {
-              setShowMobileThread(false)
-              setSelectedConversation(null)
-            }}
-            aria-label="Retour"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Avatar className="h-9 w-9">
-            {peer.photo && <AvatarImage src={peer.photo} alt={peer.firstName} />}
-            <AvatarFallback className={`text-xs font-semibold ${avatarColor}`}>
-              {peerInitials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">
-              {peer.firstName} {peer.lastName}
-            </p>
-            {peer.role && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 mt-0.5">
-                {peer.role}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* Messages area */}
-        <div className="chat-messages p-4 space-y-3 bg-muted/20">
-          {selectedConversation.messages.map((msg, idx) => {
-            const prevMsg = idx > 0 ? selectedConversation.messages[idx - 1] : null
-            const showName = !prevMsg || prevMsg.senderId !== msg.senderId
-            return (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                showName={showName}
-                prevSenderId={prevMsg?.senderId ?? null}
-              />
-            )
-          })}
-          <div ref={threadEndRef} />
-        </div>
-
-        {/* Message input area */}
-        <div className="chat-input-bar border-t border-border/50 bg-background p-3">
-          <div className="flex items-end gap-2">
-            <Textarea
-              ref={threadInputRef}
-              value={threadInput}
-              onChange={(e) => setThreadInput(e.target.value)}
-              placeholder="Écrire un message..."
-              className="min-h-[40px] max-h-[120px] resize-none text-sm"
-              rows={1}
-              onFocus={() => {
-                setTimeout(() => {
-                  threadInputRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
-                }, 300)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendThreadMessage()
-                }
-              }}
-            />
-            <Button
-              size="icon"
-              className="h-10 w-10 shrink-0 rounded-xl"
-              onClick={handleSendThreadMessage}
-              disabled={!threadInput.trim() || sendingThread}
-              aria-label="Envoyer"
-            >
-              {sendingThread ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+    })()
+  )
 
   /* ─── Render: Left panel skeleton ─── */
 
@@ -807,13 +771,7 @@ export function MessagesPage() {
         </div>
 
         {/* ─── Right panel: Thread ─── */}
-        <div
-          className={`flex-1 min-w-0 ${
-            showMobileThread ? 'flex' : 'hidden md:flex'
-          }`}
-        >
-          <ThreadPanel />
-        </div>
+        <div className={`flex-1 min-w-0 ${showMobileThread ? 'flex' : 'hidden md:flex'}`}>{threadPanelContent}</div>
       </div>
 
       {/* ─── New Message Dialog ─── */}
