@@ -43,6 +43,10 @@ interface AppState {
   // Theme
   theme: 'professional' | 'light' | 'dark'
   setTheme: (theme: 'professional' | 'light' | 'dark') => void
+
+  // Hydration
+  hasHydrated: boolean
+  setHasHydrated: (v: boolean) => void
 }
 
 const initialAuth: AuthState = {
@@ -106,6 +110,9 @@ export const useAppStore = create<AppState>()(
 
       theme: 'professional',
       setTheme: (theme) => set({ theme }),
+
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
     {
       name: 'mychurch-storage',
@@ -114,6 +121,25 @@ export const useAppStore = create<AppState>()(
         theme: state.theme,
         currentView: state.currentView,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Centralise validation expiration: token expiré → logout propre, évite Bearer expiré
+          try {
+            const tok = state.auth.token
+            if (tok) {
+              const parts = tok.split('.')
+              if (parts.length === 3) {
+                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+                if (payload.exp && Date.now() >= payload.exp * 1000) {
+                  state.auth = { ...initialAuth }
+                  state.currentView = 'landing'
+                }
+              }
+            }
+          } catch {}
+          state.setHasHydrated(true)
+        }
+      },
     }
   )
 )

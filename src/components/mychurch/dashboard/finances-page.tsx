@@ -93,9 +93,10 @@ export function FinancesPage() {
         ...(currencyFilter !== 'all' && { currency: currencyFilter }),
         ...(locationFilter !== 'all' && { location: locationFilter }),
       })
-      const res = await fetch(`/api/finances?${params}`, {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const [res, mRes] = await Promise.all([
+        fetch(`/api/finances?${params}`, { headers: { 'Authorization': `Bearer ${auth.token}` } }),
+        fetch('/api/members?limit=100', { headers: { 'Authorization': `Bearer ${auth.token}` } }),
+      ])
       if (res.ok) {
         const data = await res.json()
         setTransactions(data.transactions || data.data || [])
@@ -107,16 +108,15 @@ export function FinancesPage() {
         })
         if (data.currencies) setCurrencies(data.currencies)
         if (data.churchCurrency) setChurchCurrency(data.churchCurrency)
-        // Next reference number
         if (data.nextReferenceNumberFormatted) setNextRefNumber(data.nextReferenceNumberFormatted)
+      } else {
+        console.error('Finances fetch failed:', res.status)
       }
-      // Fetch members for dropdown
-      const mRes = await fetch('/api/members?limit=100', {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
       if (mRes.ok) {
         const mData = await mRes.json()
         setMembers(mData.members || mData.data || [])
+      } else {
+        console.error('Members fetch failed:', mRes.status)
       }
     } catch (err) {
       console.error(err)

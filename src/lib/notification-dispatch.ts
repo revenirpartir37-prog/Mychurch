@@ -163,36 +163,46 @@ export async function dispatchEventRemindersForChurch({
   })
   if (users.length === 0) return 0
 
+  // Batch par event: 1 findMany dedupe + 1 createMany + 1 push vs N×(create+notifyUser)
   let createdReminders = 0
   for (const event of events) {
-    for (const user of users) {
-      const dedupeKey = `event-reminder:${event.id}:${user.id}:${event.startDate.toISOString()}`
-      try {
-        await db.churchSetting.create({
-          data: {
-            churchId,
-            key: dedupeKey,
-            value: now.toISOString(),
-          },
-        })
-
-        const title = 'Rappel d’événement'
-        const message = `${event.title} commence le ${formatEventDate(event.startDate)}${event.location ? ` à ${event.location}` : ''}.`
-        await notifyUser({
-          churchId,
-          userId: user.id,
-          title,
-          message,
-          type: 'info',
-          push: true,
-        })
-        createdReminders += 1
-      } catch (error) {
-        if (!isUniqueConstraintError(error)) {
-          throw error
-        }
+    const dedupeKeys = users.map((u) => `event-reminder:${event.id}:${u.id}:${event.startDate.toISOString()}`)
+    const existing = await db.churchSetting.findMany({
+      where: { churchId, key: { in: dedupeKeys } },
+      select: { key: true },
+    })
+    const existingSet = new Set(existing.map((e) => e.key))
+    const toCreateKeys: string[] = []
+    const toNotifyUserIds: string[] = []
+    for (let i = 0; i < users.length; i++) {
+      if (!existingSet.has(dedupeKeys[i])) {
+        toCreateKeys.push(dedupeKeys[i])
+        toNotifyUserIds.push(users[i].id)
       }
     }
+    if (toCreateKeys.length === 0) continue
+    // Crée les clés dedupe en batch (skipDuplicates évite race)
+    try {
+      await db.churchSetting.createMany({
+        data: toCreateKeys.map((k) => ({ churchId, key: k, value: now.toISOString() })),
+        skipDuplicates: true,
+      })
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error
+    }
+    // Re-vérifie ce qui a vraiment été inséré (skipDuplicates)
+    const createdKeys = await db.churchSetting.findMany({
+      where: { churchId, key: { in: toCreateKeys } },
+      select: { key: true },
+    })
+    if (createdKeys.length === 0) continue
+    const createdSet = new Set(createdKeys.map((c) => c.key))
+    const finalUserIds = toNotifyUserIds.filter((_, idx) => createdSet.has(toCreateKeys[idx]))
+    if (finalUserIds.length === 0) continue
+    const title = 'Rappel d’événement'
+    const message = `${event.title} commence le ${formatEventDate(event.startDate)}${event.location ? ` à ${event.location}` : ''}.`
+    await notifyUsers({ churchId, userIds: finalUserIds, title, message, type: 'info', push: true })
+    createdReminders += finalUserIds.length
   }
 
   return createdReminders

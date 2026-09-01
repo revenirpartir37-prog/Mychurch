@@ -8,6 +8,10 @@ import { supabase } from '@/lib/supabase'
 let channelCounter = 0
 const uniqueId = () => `realtime-${++channelCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
+function normalizeTableName(name: string): string {
+  return name.trim().toLowerCase()
+}
+
 // Tables activées sur la publication Realtime.
 // Se déclenche sur INSERT/UPDATE/DELETE et appelle `onChange` (rafraîchit les données).
 export function useSupabaseRealtime(
@@ -18,44 +22,43 @@ export function useSupabaseRealtime(
   const onChangeRef = useRef(onChange)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   onChangeRef.current = onChange
+  const normalizedTables = tables.map(normalizeTableName)
 
   useEffect(() => {
     if (!tables.length || !supabase) return
 
-    // On ne construit le canal qu'une seule fois par instance (fm de life).
-    if (!channelRef.current) {
-      channelRef.current = supabase
-        .channel(uniqueId())
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public' },
-          (payload) => {
-            const table = payload.table as string
-            const rec = (payload.new ?? (payload as any).old) as { churchId?: string } | null
-            // Ne rafraîchir que si la table nous concerne
-            if (tables.includes(table)) {
-              // Si un filtre par église est fourni, ignorer les autres églises
-              if (filterChurchId && rec?.churchId && rec.churchId !== filterChurchId) {
-                return
-              }
-              onChangeRef.current()
-            }
-          }
-        )
-        .subscribe((status, err) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn(JSON.stringify({ scope: 'realtime', msg: 'CHANNEL_ERROR', status, err: err ? String(err) : undefined, tables }))
-            // Fallback: forcer un refetch immédiat si le canal tombe
+    // Recrée le canal si filterChurchId/tables change — évite closure stale (lot8)
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+    const channel = supabase
+      .channel(uniqueId())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public' },
+        (payload) => {
+          const table = normalizeTableName(payload.table as string)
+          const rec = (payload.new ?? (payload as any).old) as { churchId?: string } | null
+          if (normalizedTables.includes(table)) {
+            if (filterChurchId && rec?.churchId && rec.churchId !== filterChurchId) return
             onChangeRef.current()
           }
-        })
-    }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(JSON.stringify({ scope: 'realtime', msg: 'CHANNEL_ERROR', status, err: err ? String(err) : undefined, tables: normalizedTables }))
+          onChangeRef.current()
+        }
+      })
+    channelRef.current = channel
 
     return () => {
-      // On laisse chaque composant nettoyer son propre canal à son démontage.
-      const channel = channelRef.current
-      channelRef.current = null
-      if (channel) supabase.removeChannel(channel)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
-  }, [JSON.stringify(tables), filterChurchId])
+  }, [JSON.stringify(normalizedTables), filterChurchId])
 }

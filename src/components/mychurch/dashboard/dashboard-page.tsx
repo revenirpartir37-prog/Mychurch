@@ -141,20 +141,50 @@ export function DashboardPage() {
     day: 'numeric',
   })
 
+  const hasHydrated = useAppStore((s) => s.hasHydrated)
+  const authStatus: 'hydrating' | 'authenticated' | 'unauthenticated' = !hasHydrated ? 'hydrating' : auth.isAuthenticated && auth.token ? 'authenticated' : 'unauthenticated'
+
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    if (authStatus !== 'authenticated') return
+    const ac = new AbortController()
+    loadDashboardData(ac.signal)
+    return () => ac.abort()
+  }, [authStatus, auth.token, auth.churchId])
 
+  const [realtimeOk, setRealtimeOk] = useState(false)
   // Realtime Supabase : rafraîchit le dashboard dès qu'une donnée change (en complément du polling)
-  useSupabaseRealtime(['transaction', 'member', 'event', 'attendance', 'debt', 'notification'], () => loadDashboardData(), auth.churchId)
+  useSupabaseRealtime(['transaction', 'member', 'event', 'attendance', 'debt', 'notification'], () => {
+    if (authStatus === 'authenticated') {
+      setRealtimeOk(true)
+      loadDashboardData()
+    }
+  }, auth.churchId)
 
-  async function loadDashboardData() {
+  // Fallback polling 60s si realtime KO — single interval, clear au démontage, évite requêtes concurrentes
+  const fetchingRef = useRef(false)
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return
+    const id = window.setInterval(() => {
+      if (!realtimeOk && !fetchingRef.current) {
+        fetchingRef.current = true
+        loadDashboardData().finally(() => { fetchingRef.current = false })
+      }
+    }, 60000)
+    return () => window.clearInterval(id)
+  }, [authStatus, realtimeOk])
+
+  async function loadDashboardData(signal?: AbortSignal) {
+    if (authStatus !== 'authenticated' || !auth.token) return
     try {
-      const token = auth.token
-      const headers = { 'Authorization': `Bearer ${token}` }
-
-      const res = await fetch('/api/dashboard', { headers })
-      if (!res.ok) return
+      const headers = { 'Authorization': `Bearer ${auth.token}` }
+      const res = await fetch('/api/dashboard', { headers, signal })
+      if (res.status === 401) {
+        const { toast } = await import('sonner')
+        toast.error('Session expirée, veuillez vous reconnecter')
+        useAppStore.getState().logout()
+        return
+      }
+      if (!res.ok) throw new Error(`Dashboard ${res.status}: ${await res.text().then((t) => t.slice(0, 200)).catch(() => '')}`)
       const data = await res.json()
 
       const statsData = data.stats ?? {}
@@ -183,7 +213,16 @@ export function DashboardPage() {
         setUpcomingEvents(allEvents.filter((e) => new Date(e.startDate) > now))
       }
     } catch (err) {
+      if ((err as any)?.name === 'AbortError') return
       console.error('Dashboard load error:', err)
+      // Déduplication toast: 1 seul message toutes les 5s
+      const now = Date.now()
+      const last = (loadDashboardData as any)._lastToastAt || 0
+      if (now - last > 5000) {
+        ;(loadDashboardData as any)._lastToastAt = now
+        const { toast } = await import('sonner')
+        toast.error(err instanceof Error ? err.message : 'Erreur de chargement du tableau de bord')
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)

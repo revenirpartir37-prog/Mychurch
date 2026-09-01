@@ -47,38 +47,48 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Ce compte utilisateur est désactivé' }, { status: 403 })
     }
 
-    // --- Password verification ---
+    // --- Password verification avec timeout contrôlé ---
     let passwordValid = false
     let supabaseUid: string | null = null
+    let supabaseTimedOut = false
+    let supabaseErrorCode: string | null = null
 
-    // Step 1: Try Supabase Auth (completely safe — never throws to outer catch)
+    // Step 1: Try Supabase Auth avec timeout 2500ms (ne bloque pas le login)
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       if (supabaseUrl && supabaseAnonKey && supabaseUrl.startsWith('http')) {
         const { createClient } = await import('@supabase/supabase-js')
-        const client = createClient(supabaseUrl, supabaseAnonKey, {
-          auth: { persistSession: false },
-        })
-        const { data: authData, error } = await client.auth.signInWithPassword({
-          email: userEmail,
-          password: data.password,
-        })
+        const client = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } })
+        const supabasePromise = client.auth.signInWithPassword({ email: userEmail, password: data.password })
+        const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SUPABASE_TIMEOUT')), 2500))
+        const { data: authData, error } = (await Promise.race([supabasePromise, timeoutPromise])) as any
+        if (error) supabaseErrorCode = (error as any).code || (error as any).message || null
         if (!error && authData?.user) {
           passwordValid = true
           supabaseUid = authData.user.id
         }
       }
-    } catch {
-      // Supabase unavailable — fall through to bcrypt
+    } catch (e) {
+      if ((e as Error).message === 'SUPABASE_TIMEOUT') {
+        supabaseTimedOut = true
+        console.warn(JSON.stringify({ scope: 'auth:login', msg: 'SUPABASE_TIMEOUT_2500', userEmail }))
+      } else {
+        supabaseErrorCode = (e as any)?.code || null
+        console.warn(JSON.stringify({ scope: 'auth:login', msg: 'SUPABASE_ERROR', error: e instanceof Error ? e.message : String(e) }))
+      }
     }
 
-    // Step 2: Fallback to bcrypt if Supabase didn't work
+    // Step 2: Fallback bcrypt si Supabase n'a pas validé (timeout ou mauvais mdp)
     if (!passwordValid) {
       try {
         passwordValid = await bcrypt.compare(data.password, user.passwordHash)
       } catch {
         passwordValid = false
+      }
+      if (!passwordValid && supabaseTimedOut) {
+        // Provider lent, mais bcrypt aussi invalide → identifiants invalides (pas erreur serveur)
+        return Response.json({ error: 'Identifiants invalides' }, { status: 401 })
       }
     }
 
@@ -144,12 +154,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json(
-        { error: 'Données de formulaire invalides', details: error.issues },
-        { status: 400 }
-      )
+      return Response.json({ error: 'Données de formulaire invalides', details: error.issues }, { status: 400 })
     }
     console.error('Login error:', error)
-    return Response.json({ error: 'Identifiants invalides ou erreur de connexion' }, { status: 500 })
+    // Différencie erreur interne vs identifiants (ne pas masquer 500 en 401)
+    const isDbError = (error as any)?.code?.startsWith('P') || (error as Error).message?.includes('connect')
+    if (isDbError) return Response.json({ error: 'Erreur serveur, réessayez' }, { status: 503 })
+    return Response.json({ error: 'Erreur interne' }, { status: 500 })
   }
 }

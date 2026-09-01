@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 import { EVENT_LABELS, type EventType } from '@/lib/constants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -937,6 +938,7 @@ export function EventsPage() {
     }
   }, [pillFilter, auth.token])
 
+  useSupabaseRealtime(['event'], () => fetchEvents(), auth.churchId)
   useEffect(() => {
     if (auth.token) fetchEvents()
   }, [fetchEvents, auth.token])

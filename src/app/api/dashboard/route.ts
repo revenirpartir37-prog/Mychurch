@@ -24,8 +24,12 @@ export async function GET(request: NextRequest) {
 
     const { role, churchId } = auth
 
-    await dispatchEventRemindersForChurch({ churchId })
+    // Reminders découplés du chemin critique — ne bloque pas la réponse dashboard
+    void dispatchEventRemindersForChurch({ churchId }).catch((e) =>
+      console.warn(JSON.stringify({ scope: 'dashboard:reminders', msg: 'FAILED', error: e instanceof Error ? e.message : String(e) }))
+    )
 
+    const startOfYear = new Date(new Date().getFullYear(), 0, 1)
     const [
       memberCount,
       eventCount,
@@ -36,6 +40,7 @@ export async function GET(request: NextRequest) {
       auditLogs,
       upcomingEvents,
       pendingDebts,
+      totals,
     ] = await Promise.all([
       db.member.count({ where: { churchId } }),
       db.event.count({ where: { churchId } }),
@@ -76,14 +81,12 @@ export async function GET(request: NextRequest) {
             take: 5,
           })
         : Promise.resolve(null),
+      db.transaction.groupBy({
+        by: ['type', 'currency'],
+        where: { churchId, date: { gte: startOfYear } },
+        _sum: { amount: true },
+      }),
     ])
-
-    // Totaux multi-devises (même logique que /api/finances)
-    const totals = await db.transaction.groupBy({
-      by: ['type', 'currency'],
-      where: { churchId },
-      _sum: { amount: true },
-    })
 
     const baseCurrency = normalizeCurrencyCode(church?.currency)
     const baseInitialCapital = church?.initialCapital || 0

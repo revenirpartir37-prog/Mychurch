@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   reactStrictMode: false,
   allowedDevOrigins: [
     "preview-chat-772802f7-552f-4f96-ad21-87cad130037a.space-z.ai",

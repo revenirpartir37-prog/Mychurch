@@ -27,10 +27,24 @@ export async function generateRefreshToken(userId: string): Promise<string> {
     .sign(REFRESH_SECRET)
 }
 
+export function isJwtExpired(token: string | null): boolean {
+  if (!token) return true
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+    if (!payload.exp) return false
+    return Date.now() >= payload.exp * 1000
+  } catch {
+    return true
+  }
+}
+
 export async function verifyAccessToken(token: string): Promise<JWTPayload | null> {
   if (!token || typeof token !== 'string' || token === 'null' || token === 'undefined' || token.trim() === '') {
     return null
   }
+  if (isJwtExpired(token)) return null
   try {
     const { payload } = await jwtVerify(token.trim(), JWT_SECRET)
     if (!payload || !payload.userId || !payload.churchId) return null

@@ -74,3 +74,4 @@ worklog.md
 /skills/
 
 .vercel
+.env*.local

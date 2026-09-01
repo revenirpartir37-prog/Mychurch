@@ -114,36 +114,38 @@ export function ReportsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [fRes, mRes, aRes] = await Promise.all([
-        fetch('/api/finances?limit=100', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
-        fetch('/api/members?limit=100', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
-        fetch('/api/attendance?limit=100', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
-      ])
-
-      if (fRes.ok) {
+      // Charge uniquement les données nécessaires au reportType (évite 300 lignes systématiques)
+      const needFinances = reportType === 'financial' || reportType === 'complete'
+      const needMembers = reportType === 'members' || reportType === 'complete'
+      const needAttendance = reportType === 'members' || reportType === 'complete'
+      const promises: Promise<Response>[] = []
+      const keys: string[] = []
+      if (needFinances) { promises.push(fetch('/api/finances?limit=100', { headers: { Authorization: `Bearer ${auth.token}` } })); keys.push('finances') }
+      if (needMembers) { promises.push(fetch('/api/members?limit=100', { headers: { Authorization: `Bearer ${auth.token}` } })); keys.push('members') }
+      if (needAttendance) { promises.push(fetch('/api/attendance?limit=100', { headers: { Authorization: `Bearer ${auth.token}` } })); keys.push('attendance') }
+      const results = await Promise.all(promises)
+      const map = new Map(keys.map((k, i) => [k, results[i]]))
+      const fRes = map.get('finances')
+      const mRes = map.get('members')
+      const aRes = map.get('attendance')
+      if (fRes?.ok) {
         const fData = await fRes.json()
         setTransactions(fData.transactions || fData.data || [])
-      }
-      if (mRes.ok) {
+      } else if (needFinances) setTransactions([])
+      if (mRes?.ok) {
         const mData = await mRes.json()
         setMembers(mData.members || mData.data || [])
-      }
-      if (aRes.ok) {
+      } else if (needMembers) setMembers([])
+      if (aRes?.ok) {
         const aData = await aRes.json()
         setAttendance(aData.attendance || aData.data || [])
-      }
+      } else if (needAttendance) setAttendance([])
     } catch {
       toast.error('Erreur de chargement des données')
     } finally {
       setLoading(false)
     }
-  }, [auth.token])
+  }, [auth.token, reportType])
 
   useEffect(() => {
     fetchData()
