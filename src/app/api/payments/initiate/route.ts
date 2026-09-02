@@ -1,10 +1,11 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { createPayment, usdToXof } from '@/lib/geniuspay'
+import { createPayment } from '@/lib/geniuspay'
+import { normalizeCurrencyCode } from '@/lib/currency'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
-const PRICING = { memberCard: 10, memberCardXOF: 6000, monthly: 50, annual: 100 }
+const PRICING = { memberCard: 10, monthly: 50, annual: 100 }
 
 const initiatePaymentSchema = z.object({
   amount: z.number().positive('Amount must be positive'),
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       select: { currency: true },
     })
 
-    const targetCurrency = data.currency || church?.currency || 'USD'
+    const targetCurrency = normalizeCurrencyCode(data.currency || church?.currency || 'USD')
 
     // Determine amount and currency based on targetCurrency
     let finalAmount: number
@@ -50,16 +51,21 @@ export async function POST(request: NextRequest) {
       const usdAmount = data.paymentType === 'subscription'
         ? (data.plan === 'annual' ? PRICING.annual : PRICING.monthly)
         : PRICING.memberCard
-      // Approximate Congolese Franc rate: 1 USD = 2800 CDF
       finalAmount = Math.round(usdAmount * 2800)
-    } else {
-      // Default to XOF
-      finalCurrency = 'XOF'
+    } else if (targetCurrency === 'EUR') {
+      finalCurrency = 'EUR'
       if (data.paymentType === 'subscription') {
-        const usdAmount = data.plan === 'annual' ? PRICING.annual : PRICING.monthly
-        finalAmount = usdToXof(usdAmount)
+        finalAmount = data.plan === 'annual' ? PRICING.annual : PRICING.monthly
       } else {
-        finalAmount = PRICING.memberCardXOF
+        finalAmount = PRICING.memberCard
+      }
+    } else {
+      // Default to USD for any unrecognized currency
+      finalCurrency = 'USD'
+      if (data.paymentType === 'subscription') {
+        finalAmount = data.plan === 'annual' ? PRICING.annual : PRICING.monthly
+      } else {
+        finalAmount = PRICING.memberCard
       }
     }
 
