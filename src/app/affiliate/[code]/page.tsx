@@ -89,6 +89,11 @@ export default function AffiliateJoinPage() {
 
       if (res.ok) {
         const data = await res.json()
+        if (data.paymentUrl) {
+          toast.success('Compte créé ! Redirection vers le paiement de 30 $ USD...')
+          window.location.href = data.paymentUrl
+          return
+        }
         setCreatedAdminEmail(data.user?.email || form.adminEmail)
         setSuccess(true)
         toast.success('Paroisse affiliée créée avec succès !')
@@ -354,13 +359,24 @@ export default function AffiliateJoinPage() {
                 </div>
               </div>
 
+              {/* Frais d'affiliation obligatoires */}
+              <div className="rounded-xl border border-primary/30 bg-primary/10 p-4 space-y-2 text-xs">
+                <div className="flex justify-between items-center text-sm font-bold">
+                  <span>Frais d'affiliation annuelle</span>
+                  <span className="text-primary text-base font-black">30 $ USD / an</span>
+                </div>
+                <p className="text-slate-300">
+                  L'adhésion au réseau donne un accès illimité à tous les modules de l'application MyChurch pendant 1 an. Dès validation, vous serez redirigé vers GeniusPay pour régler les 30 $ en toute sécurité (Mobile Money ou Carte bancaire).
+                </p>
+              </div>
+
               <Button
                 type="submit"
                 size="lg"
-                className="w-full bg-primary hover:bg-primary/90 text-white font-bold gap-2 text-sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 text-sm shadow-lg shadow-emerald-600/20"
                 disabled={submitting}
               >
-                {submitting ? 'Création en cours...' : 'Valider et activer ma paroisse'}
+                {submitting ? 'Préparation du paiement...' : 'Payer 30 $ USD et activer l’affiliation'}
               </Button>
             </form>
           </CardContent>

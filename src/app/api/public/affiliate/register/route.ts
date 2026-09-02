@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { createPayment } from '@/lib/geniuspay'
 
 const registerAffiliateSchema = z.object({
   code: z.string().min(1, 'Code d’affiliation requis'),
@@ -59,10 +60,25 @@ export async function POST(request: NextRequest) {
 
     const parentChurch = await db.church.findUnique({
       where: { affiliationCode: data.code },
+      include: {
+        subscriptions: {
+          where: { status: 'active', paymentStatus: 'completed' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     })
 
     if (!parentChurch) {
       return Response.json({ error: 'Code d’affiliation invalide' }, { status: 400 })
+    }
+
+    const parentSub = parentChurch.subscriptions[0]
+    const isParentActive = parentSub && new Date(parentSub.endDate) > new Date()
+    if (!isParentActive) {
+      return Response.json({
+        error: 'Le Siège de votre réseau doit avoir un abonnement actif (50 $ / mois ou 100 $ / an) pour enregistrer de nouvelles églises affiliées.',
+      }, { status: 403 })
     }
 
     // Vérifier si l'email de l'église existe déjà
@@ -105,7 +121,42 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 3. Créer l'abonnement initial pour l'extension (valable 1 an)
+    // 3. Initier le paiement obligatoire de 30 $ USD sur GeniusPay
+    const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || ''
+    const paymentResponse = await createPayment({
+      amount: 30,
+      currency: 'USD',
+      description: `Affiliation Réseau MyChurch (30 USD) - ${data.churchName}`,
+      customer: {
+        name: `${data.adminFirstName} ${data.adminLastName}`,
+        email: data.adminEmail,
+      },
+      success_url: `${origin}/affiliate/success?churchId=${newBranch.id}&status=success`,
+      error_url: `${origin}/affiliate/${data.code}?error=payment_failed`,
+      callback_url: `${origin}/api/payments/webhook`,
+      metadata: {
+        churchId: newBranch.id,
+        userId: adminUser.id,
+        paymentType: 'subscription',
+        plan: 'annual_branch',
+        amount: 30,
+        currency: 'USD',
+      },
+    })
+
+    if (!paymentResponse.success || !paymentResponse.data) {
+      console.error('Affiliate registration payment error:', paymentResponse.error)
+      return Response.json(
+        { error: paymentResponse.error?.message || 'Erreur lors de l’initialisation du paiement de 30 $' },
+        { status: 400 }
+      )
+    }
+
+    const paymentData = paymentResponse.data
+    const paymentUrl = paymentData.checkout_url || paymentData.payment_url || ''
+    const reference = paymentData.reference
+
+    // 4. Créer l'abonnement initial en attente de paiement (status: pending)
     const startDate = new Date()
     const endDate = new Date()
     endDate.setFullYear(endDate.getFullYear() + 1)
@@ -114,19 +165,21 @@ export async function POST(request: NextRequest) {
       data: {
         churchId: newBranch.id,
         plan: 'annual_branch',
-        status: 'active',
+        status: 'pending',
         startDate,
         endDate,
         amount: 30,
         currency: 'USD',
-        paymentStatus: 'completed',
-        paymentRef: `AFF-INIT-${parentChurch.id.slice(0, 6)}-${Date.now()}`,
+        paymentStatus: 'pending',
+        paymentRef: reference,
       },
     })
 
     return Response.json({
       success: true,
-      message: 'Paroisse affiliée créée avec succès !',
+      message: 'Compte paroisse pré-créé. Redirection vers le paiement de 30 $ USD...',
+      paymentUrl,
+      reference,
       church: {
         id: newBranch.id,
         name: newBranch.name,

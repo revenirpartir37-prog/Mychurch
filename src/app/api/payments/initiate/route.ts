@@ -26,16 +26,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = initiatePaymentSchema.parse(body)
 
-    // GeniusPay only supports XOF (Ivorian payment gateway)
-    // All internal pricing is in USD, we convert to XOF for GeniusPay
+    // Facturation et affichage directs en USD ($) sur GeniusPay
     let finalAmount: number
-    const finalCurrency = 'XOF'
+    const finalCurrency = 'USD'
 
     if (data.paymentType === 'subscription') {
       const usdAmount = data.plan === 'annual' ? PRICING_USD.annual : PRICING_USD.monthly
-      finalAmount = usdToXof(usdAmount)
+      finalAmount = usdAmount
     } else {
-      finalAmount = usdToXof(PRICING_USD.memberCard)
+      finalAmount = PRICING_USD.memberCard
     }
 
     // Get user info for customer details

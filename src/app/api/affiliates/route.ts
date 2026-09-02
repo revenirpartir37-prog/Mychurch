@@ -139,10 +139,25 @@ export async function POST(request: NextRequest) {
 
     const church = await db.church.findUnique({
       where: { id: auth.churchId },
+      include: {
+        subscriptions: {
+          where: { status: 'active', paymentStatus: 'completed' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     })
 
     if (!church || church.parentId) {
       return Response.json({ error: 'Seule une église mère peut générer un code d\'affiliation' }, { status: 403 })
+    }
+
+    const currentSub = church.subscriptions[0]
+    const isExpired = !currentSub || new Date(currentSub.endDate) < new Date()
+    if (isExpired) {
+      return Response.json({
+        error: 'Pour avoir et activer le système d\'affiliation, vous devez payer l\'abonnement Siège (50 $ par mois ou 100 $ par an).',
+      }, { status: 403 })
     }
 
     const newCode = generateAffiliationCode()

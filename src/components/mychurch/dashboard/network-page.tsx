@@ -51,6 +51,7 @@ interface AffiliateBranch {
 export function NetworkPage() {
   const [loading, setLoading] = useState(true)
   const [isHeadquarters, setIsHeadquarters] = useState(true)
+  const [isHeadquartersExpired, setIsHeadquartersExpired] = useState(false)
   const [affiliationUrl, setAffiliationUrl] = useState('')
   const [affiliationCode, setAffiliationCode] = useState('')
   const [affiliates, setAffiliates] = useState<AffiliateBranch[]>([])
@@ -65,6 +66,7 @@ export function NetworkPage() {
       if (res.ok) {
         const data = await res.json()
         setIsHeadquarters(data.isHeadquarters)
+        setIsHeadquartersExpired(!!data.isHeadquartersExpired)
         setAffiliationCode(data.affiliationCode || '')
         setAffiliationUrl(data.affiliationUrl || '')
         setAffiliates(data.affiliates || [])
@@ -74,6 +76,27 @@ export function NetworkPage() {
       toast.error('Erreur lors du chargement des églises affiliées')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePayHQ = async (plan: 'monthly' | 'annual') => {
+    setPaying(true)
+    try {
+      const res = await authFetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      const data = await res.json()
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl
+      } else {
+        toast.success('Paiement initié')
+      }
+    } catch {
+      toast.error('Erreur lors du paiement')
+    } finally {
+      setPaying(false)
     }
   }
 
@@ -208,42 +231,77 @@ export function NetworkPage() {
         </Card>
       </div>
 
-      {/* Invitation Box */}
-      <Card className="border-primary/30 shadow-sm bg-gradient-to-r from-primary/5 via-transparent to-transparent">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            Lien d'Affiliation pour Nouvelles Églises
-          </CardTitle>
-          <CardDescription>
-            Partagez ce lien au pasteur ou secrétaire d'une nouvelle extension pour qu'il enregistre sa paroisse dans votre réseau.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              readOnly
-              value={affiliationUrl}
-              className="font-mono text-xs bg-background"
-              placeholder="Génération du lien..."
-            />
-            <div className="flex gap-2 shrink-0">
-              <Button onClick={handleCopyLink} variant="default" className="gap-1.5 text-xs">
-                <Copy className="w-3.5 h-3.5" /> Copier
-              </Button>
-              <Button onClick={handleShareWhatsapp} variant="outline" className="gap-1.5 text-xs text-emerald-600 border-emerald-500/30 hover:bg-emerald-50">
-                <Share2 className="w-3.5 h-3.5" /> WhatsApp
-              </Button>
-              <Button onClick={handleRegenerateCode} variant="ghost" size="icon" title="Régénérer le code">
-                <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-              </Button>
+      {/* Invitation Box ou Blocage si pas d'abonnement Siège */}
+      {isHeadquartersExpired ? (
+        <Card className="border-amber-500/40 bg-amber-500/5 shadow-sm p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-600 shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 flex-1">
+              <h3 className="font-bold text-base text-foreground">
+                Système d&apos;affiliation inactif — Abonnement Siège requis
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Pour débloquer et utiliser le système d&apos;affiliation et affilier d&apos;autres églises à votre réseau, vous devez souscrire à un abonnement Siège actif : <strong>50 $ par mois</strong> ou <strong>100 $ par an</strong>. Chaque paroisse affiliée paiera ensuite ses frais de 30 $ / an pour rejoindre votre réseau.
+              </p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Code officiel du réseau : <strong className="font-mono text-foreground">{affiliationCode}</strong> (30 $/an par extension).
-          </p>
-        </CardContent>
-      </Card>
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 border-t border-amber-500/20">
+            <Button
+              className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 text-xs flex-1"
+              disabled={paying}
+              onClick={() => handlePayHQ('annual')}
+            >
+              <Sparkles className="w-4 h-4" /> Activer l&apos;affiliation (100 $ / an - Recommandé)
+            </Button>
+            <Button
+              variant="outline"
+              className="border-primary/30 text-primary hover:bg-primary/10 font-semibold gap-2 text-xs flex-1"
+              disabled={paying}
+              onClick={() => handlePayHQ('monthly')}
+            >
+              Activer l&apos;affiliation (50 $ / mois)
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Card className="border-primary/30 shadow-sm bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              Lien d&apos;Affiliation pour Nouvelles Églises
+            </CardTitle>
+            <CardDescription>
+              Partagez ce lien au pasteur ou secrétaire d&apos;une nouvelle extension pour qu&apos;il enregistre sa paroisse dans votre réseau (30 $ / an).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                readOnly
+                value={affiliationUrl}
+                className="font-mono text-xs bg-background"
+                placeholder="Génération du lien..."
+              />
+              <div className="flex gap-2 shrink-0">
+                <Button onClick={handleCopyLink} variant="default" className="gap-1.5 text-xs">
+                  <Copy className="w-3.5 h-3.5" /> Copier
+                </Button>
+                <Button onClick={handleShareWhatsapp} variant="outline" className="gap-1.5 text-xs text-emerald-600 border-emerald-500/30 hover:bg-emerald-50">
+                  <Share2 className="w-3.5 h-3.5" /> WhatsApp
+                </Button>
+                <Button onClick={handleRegenerateCode} variant="ghost" size="icon" title="Régénérer le code">
+                  <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Code officiel du réseau : <strong className="font-mono text-foreground">{affiliationCode}</strong>.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Affiliates Table */}
       <Card>

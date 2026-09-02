@@ -43,9 +43,9 @@ export async function POST(request: NextRequest) {
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || ''
 
     const paymentResponse = await createPayment({
-      amount: usdToXof(total),
-      currency: 'XOF',
-      description: 'Carte de membre Mychurch',
+      amount: total,
+      currency: 'USD',
+      description: `Carte de membre Mychurch (${total} USD)`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,

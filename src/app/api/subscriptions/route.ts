@@ -56,24 +56,14 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    // Vérification de paiement en attente
-    if (verifyParam === 'true' && subscription?.paymentStatus === 'pending' && subscription.paymentRef) {
+    // Vérification de paiement en attente (auto-check sur GeniusPay)
+    if (subscription?.paymentStatus === 'pending' && subscription.paymentRef) {
       try {
         const paymentResponse = await getPayment(subscription.paymentRef)
         if (paymentResponse.success && paymentResponse.data?.status === 'completed') {
-          const updated = await db.subscription.update({
+          await db.subscription.update({
             where: { id: subscription.id },
             data: { paymentStatus: 'completed', status: 'active' },
-          })
-          return Response.json({
-            subscription: updated,
-            paymentVerified: true,
-            isBranch,
-            isHeadquarters,
-            isExpired: false,
-            canAccess: true,
-            churchName: church.name,
-            parentName: church.parent?.name,
           })
         }
       } catch {
@@ -85,20 +75,16 @@ export async function GET(request: NextRequest) {
     let isExpired = false
     let canAccess = true
 
-    if (!subscription) {
-      // Nouvelle église sans abonnement enregistré
+    if (!subscription || subscription.status !== 'active' || subscription.paymentStatus !== 'completed') {
       isExpired = true
-      canAccess = isHeadquarters // L'église mère bénéficie de l'avantage de base, l'extension est bloquée
+      canAccess = isHeadquarters 
     } else {
       const isPast = new Date(subscription.endDate) < now
-      const isNotActive = subscription.status !== 'active' || subscription.paymentStatus !== 'completed'
-      isExpired = isPast || isNotActive
+      isExpired = isPast
 
       if (isBranch) {
-        // Église affiliée expirée = accès strictement restreint et interdit
         canAccess = !isExpired
       } else {
-        // Église mère expirée = accès local conservé (avantage), mais alertée
         canAccess = true
       }
     }
@@ -113,15 +99,16 @@ export async function GET(request: NextRequest) {
       parentName: church.parent?.name,
     })
   } catch (error) {
-    console.error('Subscriptions GET error:', error)
+    console.error('Subscription GET error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// POST: Create subscription with GeniusPay payment
+// POST: Create subscription with GeniusPay payment (en USD direct)
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const token = request.headers.get('authorization')?.replace('Bearer ', '') ?? ''
+    const auth = await verifyAccessToken(token)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -129,33 +116,23 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = createSubscriptionSchema.parse(body)
 
-    // Si targetChurchId est spécifié, vérifier que l'utilisateur est soit l'admin de cette église,
-    // soit l'admin du Siège parent
-    let targetChurchId = auth.churchId
-    if (data.targetChurchId && data.targetChurchId !== auth.churchId) {
-      const targetChurch = await db.church.findUnique({
-        where: { id: data.targetChurchId },
-      })
-      if (!targetChurch) {
-        return Response.json({ error: 'Église cible introuvable' }, { status: 404 })
-      }
-      if (targetChurch.parentId !== auth.churchId) {
-        return Response.json({ error: 'Seule l’église mère peut régler pour cette extension' }, { status: 403 })
-      }
-      targetChurchId = data.targetChurchId
-    }
-
     const user = await db.user.findFirst({
       where: { id: auth.userId },
-      select: { firstName: true, lastName: true, email: true },
+      select: { firstName: true, lastName: true, email: true, role: true },
     })
+
     if (!user) {
       return Response.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Déterminer l'église cible (soit l'église de l'admin, soit une église fille à renouveler)
+    const targetChurchId = data.targetChurchId || auth.churchId
+
     const targetChurch = await db.church.findUnique({
       where: { id: targetChurchId },
+      select: { id: true, name: true, parentId: true },
     })
+
     if (!targetChurch) {
       return Response.json({ error: 'Target church not found' }, { status: 404 })
     }
@@ -165,8 +142,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Plan invalide' }, { status: 400 })
     }
 
-    const paymentAmount = usdToXof(usdAmount)
-    const paymentCurrency = 'XOF'
+    // Affichage et facturation directs en USD sur GeniusPay
+    const paymentAmount = usdAmount
+    const paymentCurrency = 'USD'
 
     // Désactiver les anciens abonnements
     await db.subscription.updateMany({
@@ -189,19 +167,21 @@ export async function POST(request: NextRequest) {
     const paymentParams: any = {
       amount: paymentAmount,
       currency: paymentCurrency,
-      description: `MYCHURCH abonnement ${data.plan} - ${targetChurch.name}`,
+      description: `MYCHURCH abonnement ${data.plan} (${paymentAmount} USD) - ${targetChurch.name}`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
       },
-      success_url: `${origin}/?view=dashboard&payment=success`,
-      error_url: `${origin}/?view=dashboard&payment=error`,
+      success_url: `${origin}/?view=settings&tab=abonnement&payment=success`,
+      error_url: `${origin}/?view=settings&tab=abonnement&payment=error`,
       callback_url: `${origin}/api/payments/webhook`,
       metadata: {
         churchId: targetChurchId,
         userId: auth.userId,
         paymentType: 'subscription',
         plan: data.plan,
+        currency: 'USD',
+        amount: paymentAmount,
       },
     }
 

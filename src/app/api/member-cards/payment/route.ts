@@ -46,17 +46,15 @@ export async function POST(request: NextRequest) {
     }
 
     const usdAmount = 10
+    const paymentAmount = usdAmount
+    const paymentCurrency = 'USD'
 
-    // GeniusPay only supports XOF
-    const paymentAmount = usdToXof(usdAmount)
-    const paymentCurrency = 'XOF'
-
-    // Create payment via GeniusPay
+    // Create payment via GeniusPay in USD
     const origin = request.headers.get('origin') || ''
     const paymentParams: any = {
       amount: paymentAmount,
       currency: paymentCurrency,
-      description: `Carte membre - ${member.firstName} ${member.lastName}`,
+      description: `Carte membre - ${member.firstName} ${member.lastName} (10 USD)`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,

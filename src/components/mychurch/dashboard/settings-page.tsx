@@ -36,6 +36,10 @@ import {
   DollarSign,
   Image as ImageIcon,
   Upload,
+  Timer,
+  Clock,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -125,19 +129,65 @@ interface SubStatus {
   } | null
 }
 
+function useSubscriptionCountdown(endDateStr?: string) {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+    isExpired: false,
+  })
+
+  useEffect(() => {
+    if (!endDateStr) return
+
+    const updateCountdown = () => {
+      const end = new Date(endDateStr).getTime()
+      const now = new Date().getTime()
+      const diff = end - now
+
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true })
+        return
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+      setTimeLeft({ days, hours, minutes, seconds, isExpired: false })
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [endDateStr])
+
+  return timeLeft
+}
+
 function SubscriptionTab() {
   const [sub, setSub] = useState<SubStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual' | 'annual_branch'>('annual')
 
   useEffect(() => {
-    authFetch('/api/subscriptions')
+    const isSuccess = typeof window !== 'undefined' && window.location.search.includes('payment=success')
+    if (isSuccess) {
+      setPaymentSuccess(true)
+    }
+
+    authFetch(isSuccess ? '/api/subscriptions?verify=true' : '/api/subscriptions')
       .then(r => r.json())
       .then(d => { setSub(d); if (d.isBranch) setSelectedPlan('annual_branch') })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  const countdown = useSubscriptionCountdown(sub?.subscription?.endDate)
 
   const handlePay = async (plan: 'monthly' | 'annual' | 'annual_branch') => {
     setPaying(true)
@@ -176,6 +226,17 @@ function SubscriptionTab() {
   return (
     <div className="space-y-6">
 
+      {/* ── Bannière de confirmation après retour de paiement ── */}
+      {paymentSuccess && (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-emerald-800 dark:text-emerald-300 flex items-center gap-3 animate-in fade-in">
+          <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
+          <div className="space-y-0.5">
+            <p className="font-bold text-sm">Paiement confirmé avec succès !</p>
+            <p className="text-xs">Votre abonnement est actif et le compte à rebours est enclenché en temps réel.</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Statut actuel ── */}
       <Card className="overflow-hidden">
         <div className={`px-6 py-5 text-white ${isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : isExpired ? 'bg-gradient-to-r from-red-600 to-rose-700' : 'bg-gradient-to-r from-slate-600 to-slate-700'}`}>
@@ -204,7 +265,7 @@ function SubscriptionTab() {
         </div>
 
         {sub?.subscription && (
-          <CardContent className="p-6">
+          <CardContent className="p-6 space-y-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Formule</p>
@@ -223,6 +284,28 @@ function SubscriptionTab() {
                 <p className="font-semibold">{sub.isBranch ? '🔗 Paroisse Affiliée' : '👑 Siège Principal'}</p>
               </div>
             </div>
+
+            {/* Compte à rebours en temps réel */}
+            {isActive && (
+              <div className="p-4 rounded-xl bg-muted/50 border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+                    <Timer className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Compte à rebours de l&apos;abonnement
+                    </p>
+                    <p className="text-2xl font-mono font-black text-foreground tracking-tight">
+                      {countdown.days}j {countdown.hours}h {countdown.minutes}m {countdown.seconds}s
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs font-bold gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Actif en direct
+                </Badge>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>
