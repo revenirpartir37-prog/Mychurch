@@ -38,7 +38,13 @@ import {
   Twitter,
   Instagram,
   Youtube,
+  Check,
+  Network,
+  Crown,
+  Building2,
+  Zap,
 } from 'lucide-react'
+import { APP_VERSION } from '@/lib/constants'
 
 const CONTACT_EMAIL = 'henockaduma2@gmail.com'
 const CONTACT_WHATSAPP = '243990601417'
@@ -201,10 +207,15 @@ export function LandingPage() {
             MYCHURCH
           </h1>
 
-          {/* Tagline */}
-          <p className="text-lg sm:text-xl text-primary font-semibold mb-4">
-            La plateforme moderne de gestion d&apos;église
-          </p>
+          {/* Tagline + version */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+            <p className="text-lg sm:text-xl text-primary font-semibold">
+              La plateforme moderne de gestion d&apos;église
+            </p>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-bold">
+              <Zap className="w-3 h-3" /> v{APP_VERSION}
+            </span>
+          </div>
 
           {/* Subtitle */}
           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mb-8 leading-relaxed">
@@ -397,6 +408,189 @@ export function LandingPage() {
               </FadeInSection>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ===== PRICING SECTION ===== */}
+      <section className="relative px-4 py-16 sm:py-24 overflow-hidden">
+        {/* background */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background via-muted/20 to-background" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)`,
+            backgroundSize: '40px 40px',
+          }}
+        />
+
+        <div className="relative max-w-6xl mx-auto">
+          <FadeInSection className="text-center mb-14">
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold mb-4">
+              <Sparkles className="w-3.5 h-3.5" /> Tarifs simples &amp; transparents
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
+              Choisissez la formule adaptée à votre communauté
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+              Un seul outil complet. Aucun frais caché. Des cartes de membre disponibles à tout moment à <strong>10 $ / carte</strong>, indépendamment de votre formule.
+            </p>
+          </FadeInSection>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            {/* PLAN MENSUEL */}
+            <FadeInSection delay={0.05}>
+              <div className="rounded-2xl border border-border/60 bg-card/80 backdrop-blur-sm p-6 space-y-6 hover:-translate-y-1 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                    <Crown className="w-4 h-4" /> Siège d&apos;Église
+                  </div>
+                  <h3 className="text-xl font-bold">Formule Mensuelle</h3>
+                  <div className="flex items-end gap-1">
+                    <span className="text-5xl font-black text-foreground">50</span>
+                    <span className="text-xl font-bold text-foreground mb-1">$</span>
+                    <span className="text-sm text-muted-foreground mb-1.5">/ mois</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Sans engagement. Renouvelable chaque mois.</p>
+                </div>
+
+                <ul className="space-y-2.5 text-sm">
+                  {[
+                    'Tous les modules débloqués',
+                    'Membres, finances, événements',
+                    'Rapports & statistiques',
+                    'Cartes de membre (10 $ / unité)',
+                    'Application mobile PWA',
+                    'Support prioritaire',
+                  ].map(item => (
+                    <li key={item} className="flex items-center gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                      <span className="text-foreground/80">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  className="w-full gap-2"
+                  variant="outline"
+                  onClick={() => setCurrentView('register')}
+                >
+                  Commencer <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </FadeInSection>
+
+            {/* PLAN ANNUEL - FEATURED */}
+            <FadeInSection delay={0.12}>
+              <div className="relative rounded-2xl bg-gradient-to-b from-primary to-primary/80 text-primary-foreground p-6 space-y-6 shadow-2xl shadow-primary/30 hover:-translate-y-2 transition-all duration-300 md:-mt-4">
+                {/* Badge recommandé */}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-amber-400 text-amber-950 text-xs font-black shadow-lg">
+                    <Star className="w-3.5 h-3.5 fill-amber-950" /> MEILLEURE VALEUR
+                  </span>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center gap-2 text-primary-foreground/70 text-xs font-semibold uppercase tracking-wider">
+                    <Crown className="w-4 h-4" /> Siège d&apos;Église
+                  </div>
+                  <h3 className="text-xl font-bold">Formule Annuelle</h3>
+                  <div className="flex items-end gap-1">
+                    <span className="text-5xl font-black">100</span>
+                    <span className="text-xl font-bold mb-1">$</span>
+                    <span className="text-sm text-primary-foreground/70 mb-1.5">/ an</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block px-2 py-0.5 rounded bg-white/20 text-xs font-semibold">
+                      Économisez 500 $ vs. mensuel
+                    </span>
+                  </div>
+                </div>
+
+                <ul className="space-y-2.5 text-sm">
+                  {[
+                    'Tous les avantages mensuels',
+                    'Réseau d\'églises affiliées',
+                    'Tableau de bord réseau global',
+                    'Cartes de membre (10 $ / unité)',
+                    'Support dédié prioritaire',
+                    'Mises à jour gratuites 1 an',
+                  ].map(item => (
+                    <li key={item} className="flex items-center gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                      <span className="text-primary-foreground/90">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  className="w-full bg-white text-primary hover:bg-white/90 font-bold gap-2 shadow-lg"
+                  onClick={() => setCurrentView('register')}
+                >
+                  <Sparkles className="w-4 h-4" /> Commencer maintenant
+                </Button>
+              </div>
+            </FadeInSection>
+
+            {/* PLAN AFFILIÉ */}
+            <FadeInSection delay={0.2}>
+              <div className="rounded-2xl border border-border/60 bg-card/80 backdrop-blur-sm p-6 space-y-6 hover:-translate-y-1 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                    <Network className="w-4 h-4" /> Paroisse Affiliée
+                  </div>
+                  <h3 className="text-xl font-bold">Extension de Réseau</h3>
+                  <div className="flex items-end gap-1">
+                    <span className="text-5xl font-black text-foreground">30</span>
+                    <span className="text-xl font-bold text-foreground mb-1">$</span>
+                    <span className="text-sm text-muted-foreground mb-1.5">/ an</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Par paroisse rattachée au Siège parent.</p>
+                </div>
+
+                <ul className="space-y-2.5 text-sm">
+                  {[
+                    'Tous les modules complets',
+                    'Interface administrateur dédiée',
+                    'Gestion autonome des membres',
+                    'Cartes de membre (10 $ / unité)',
+                    'Rattachée au réseau du Siège',
+                    'Renouvellement par le Siège ou soi-même',
+                  ].map(item => (
+                    <li key={item} className="flex items-center gap-2">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                      <span className="text-foreground/80">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="p-3 rounded-xl bg-muted/60 border border-border/50 text-xs text-muted-foreground">
+                  <Building2 className="w-4 h-4 inline mr-1.5 text-primary" />
+                  Activé via le <strong className="text-foreground">lien d&apos;affiliation</strong> fourni par le Siège. Le Siège doit disposer d&apos;un abonnement annuel actif.
+                </div>
+              </div>
+            </FadeInSection>
+          </div>
+
+          {/* Pricing note - cards */}
+          <FadeInSection className="mt-10">
+            <div className="max-w-3xl mx-auto rounded-xl border border-primary/20 bg-primary/5 p-5 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm text-foreground">Cartes de membre — Paiement à la demande</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  Les cartes sont achetées à tout moment en dehors de l&apos;abonnement, à <strong className="text-foreground">10 $ / carte</strong> (disponibles en packs de 20, 60 cartes ou quantité personnalisée). Valable pour les Sièges et les Paroisses affiliées sans distinction.
+                </p>
+              </div>
+            </div>
+          </FadeInSection>
         </div>
       </section>
 

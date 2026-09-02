@@ -1,4 +1,5 @@
-const CACHE_NAME = 'mychurch-v3'
+const CACHE_NAME = 'mychurch-v4'
+const APP_VERSION = '0.3.0'
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -9,7 +10,8 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
   )
-  self.skipWaiting()
+  // Don't call skipWaiting() here — let the hook decide when to activate
+  // so the banner can appear before the new SW takes over.
 })
 
 self.addEventListener('activate', (event) => {
@@ -22,9 +24,11 @@ self.addEventListener('activate', (event) => {
       )
     )
   )
-  // Notify all clients that a new version is available
-  self.clients.matchAll().then((clients) => {
-    clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME }))
+  // Notify all open tabs that a new version is live
+  self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((clients) => {
+    clients.forEach((client) =>
+      client.postMessage({ type: 'SW_UPDATE_AVAILABLE', version: APP_VERSION })
+    )
   })
   self.clients.claim()
 })
