@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mychurch-v2'
+const CACHE_NAME = 'mychurch-v3'
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -22,7 +22,18 @@ self.addEventListener('activate', (event) => {
       )
     )
   )
+  // Notify all clients that a new version is available
+  self.clients.matchAll().then((clients) => {
+    clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME }))
+  })
   self.clients.claim()
+})
+
+// Listen for messages from clients
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 // NETWORK-FIRST : on cherche le réseau en priorité pour toujours servir la

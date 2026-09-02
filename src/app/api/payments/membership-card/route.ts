@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!paymentResponse.success || !paymentResponse.data) {
+      console.error('GeniusPay membership-card error:', paymentResponse.error)
       return Response.json(
         { error: paymentResponse.error?.message || 'Failed to create payment' },
         { status: 400 }

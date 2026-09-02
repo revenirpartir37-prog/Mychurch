@@ -66,11 +66,14 @@ export async function POST(request: NextRequest) {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
       },
+      success_url: `${baseUrl}/?view=dashboard&payment=success`,
+      error_url: `${baseUrl}/?view=dashboard&payment=error`,
       callback_url: `${baseUrl}/api/payments/webhook`,
       metadata,
     })
 
     if (!paymentResponse.success || !paymentResponse.data) {
+      console.error('GeniusPay error:', paymentResponse.error)
       return Response.json(
         { error: paymentResponse.error?.message || 'Failed to create payment' },
         { status: 400 }

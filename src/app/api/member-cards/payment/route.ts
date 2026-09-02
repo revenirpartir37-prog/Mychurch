@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
       },
       success_url: `${origin}/?view=member-cards&payment=success`,
       error_url: `${origin}/?view=member-cards&payment=error`,
+      callback_url: `${origin}/api/payments/webhook`,
       metadata: {
         churchId: auth.churchId,
         userId: auth.userId,
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
     const paymentResponse = await createPayment(paymentParams)
 
     if (!paymentResponse.success || !paymentResponse.data) {
+      console.error('GeniusPay member-card error:', paymentResponse.error)
       return Response.json(
         { error: paymentResponse.error?.message || 'Failed to create payment' },
         { status: 400 }

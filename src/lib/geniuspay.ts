@@ -147,18 +147,37 @@ export interface GeniusPayWebhookPayload {
 
 // Create a payment (returns checkout URL if no payment_method specified)
 export async function createPayment(params: GeniusPayPaymentCreate): Promise<GeniusPayPaymentResponse> {
-  const response = await fetch(`${GENIUSPAY_BASE_URL}/payments`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(params),
-  })
+  try {
+    const response = await fetch(`${GENIUSPAY_BASE_URL}/payments`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(params),
+    })
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(errorData?.error?.message || `GeniusPay API error: ${response.status}`)
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      return {
+        success: false,
+        data: null as any,
+        error: {
+          code: String(response.status),
+          message: data?.error?.message || data?.message || `GeniusPay API error: ${response.status}`,
+        },
+      }
+    }
+
+    return data
+  } catch (error) {
+    return {
+      success: false,
+      data: null as any,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to connect to GeniusPay',
+      },
+    }
   }
-
-  return response.json()
 }
 
 // Get a payment by reference

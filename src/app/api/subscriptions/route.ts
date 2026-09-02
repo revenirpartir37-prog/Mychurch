@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create payment via GeniusPay (no payment_method = checkout URL where user picks method)
+    const origin = request.headers.get('origin') || ''
     const paymentParams: any = {
       amount: paymentAmount,
       currency: paymentCurrency,
@@ -125,6 +126,9 @@ export async function POST(request: NextRequest) {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
       },
+      success_url: `${origin}/?view=dashboard&payment=success`,
+      error_url: `${origin}/?view=dashboard&payment=error`,
+      callback_url: `${origin}/api/payments/webhook`,
       metadata: {
         churchId: auth.churchId,
         userId: auth.userId,
@@ -149,6 +153,7 @@ export async function POST(request: NextRequest) {
     const paymentResponse = await createPayment(paymentParams)
 
     if (!paymentResponse.success || !paymentResponse.data) {
+      console.error('GeniusPay subscription error:', paymentResponse.error)
       return Response.json(
         { error: paymentResponse.error?.message || 'Failed to create payment' },
         { status: 400 }

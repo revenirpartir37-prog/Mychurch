@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { OneSignalProvider } from "@/components/mychurch/shared/onesignal-provider";
 import { AppShell } from "@/components/mychurch/shared/app-shell";
+import { PWAUpdateBanner } from "@/components/mychurch/shared/pwa-update-banner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -61,6 +62,7 @@ export default function RootLayout({
               {children}
             </AppShell>
             <Toaster />
+            <PWAUpdateBanner />
           </OneSignalProvider>
         </ThemeProvider>
       </body>
