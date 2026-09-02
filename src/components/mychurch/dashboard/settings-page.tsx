@@ -107,6 +107,260 @@ function getActionColor(action: string): string {
   return ''
 }
 
+// ────────────────────────────────────────────────────────────────
+//  SUBSCRIPTION TAB — full pricing + live status
+// ────────────────────────────────────────────────────────────────
+interface SubStatus {
+  isBranch: boolean
+  isHeadquarters: boolean
+  isExpired: boolean
+  canAccess: boolean
+  churchName: string
+  parentName?: string
+  subscription: {
+    plan: string
+    status: string
+    endDate: string
+    amount: number
+  } | null
+}
+
+function SubscriptionTab() {
+  const [sub, setSub] = useState<SubStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [paying, setPaying] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual' | 'annual_branch'>('annual')
+
+  useEffect(() => {
+    authFetch('/api/subscriptions')
+      .then(r => r.json())
+      .then(d => { setSub(d); if (d.isBranch) setSelectedPlan('annual_branch') })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handlePay = async (plan: 'monthly' | 'annual' | 'annual_branch') => {
+    setPaying(true)
+    try {
+      const res = await authFetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      const data = await res.json()
+      if (data.paymentUrl) window.location.href = data.paymentUrl
+      else toast.success('Paiement initié')
+    } catch { toast.error('Erreur de paiement') }
+    finally { setPaying(false) }
+  }
+
+  const planLabel = (plan?: string) => {
+    if (!plan) return '—'
+    if (plan === 'annual') return 'Annuel Siège (100 $ / an)'
+    if (plan === 'monthly') return 'Mensuel Siège (50 $ / mois)'
+    if (plan === 'annual_branch') return 'Paroisse Affiliée (30 $ / an)'
+    return plan
+  }
+
+  const endDateFmt = (d?: string) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
+
+  if (loading) return (
+    <div className="space-y-4">
+      {[1,2,3].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
+    </div>
+  )
+
+  const isActive = sub?.subscription && !sub.isExpired
+  const isExpired = sub?.isExpired
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Statut actuel ── */}
+      <Card className="overflow-hidden">
+        <div className={`px-6 py-5 text-white ${isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : isExpired ? 'bg-gradient-to-r from-red-600 to-rose-700' : 'bg-gradient-to-r from-slate-600 to-slate-700'}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm shrink-0">
+                <Zap className="h-7 w-7" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">
+                  {isActive ? planLabel(sub?.subscription?.plan) : isExpired ? 'Abonnement Expiré' : 'Aucun Abonnement Actif'}
+                </h2>
+                <p className="text-sm text-white/80">
+                  {isActive
+                    ? `Actif jusqu'au ${endDateFmt(sub?.subscription?.endDate)}`
+                    : isExpired
+                    ? `Expiré le ${endDateFmt(sub?.subscription?.endDate)}`
+                    : 'Souscrivez pour débloquer toutes les fonctionnalités'}
+                </p>
+              </div>
+            </div>
+            <Badge className={`shrink-0 font-bold ${isActive ? 'bg-white/20 text-white border-0' : 'bg-white/20 text-white border-0'}`}>
+              {isActive ? '✅ Actif' : isExpired ? '❌ Expiré' : '⏳ Inactif'}
+            </Badge>
+          </div>
+        </div>
+
+        {sub?.subscription && (
+          <CardContent className="p-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Formule</p>
+                <p className="font-semibold">{planLabel(sub.subscription.plan)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Statut</p>
+                <p className="font-semibold capitalize">{sub.subscription.status}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Expiration</p>
+                <p className="font-semibold">{endDateFmt(sub.subscription.endDate)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Type</p>
+                <p className="font-semibold">{sub.isBranch ? '🔗 Paroisse Affiliée' : '👑 Siège Principal'}</p>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* ── Grille tarifaire ── */}
+      <div>
+        <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <DollarSign className="w-4 h-4 text-primary" /> Nos formules d&apos;abonnement
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+          {/* Plan Mensuel */}
+          <div
+            className={`relative rounded-xl border-2 p-5 cursor-pointer transition-all space-y-3 ${!sub?.isBranch && selectedPlan === 'monthly' ? 'border-primary bg-primary/5 shadow' : 'border-border hover:border-primary/40'} ${sub?.isBranch ? 'opacity-50 pointer-events-none' : ''}`}
+            onClick={() => !sub?.isBranch && setSelectedPlan('monthly')}
+          >
+            <div>
+              <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-1">Siège d&apos;Église</p>
+              <p className="text-lg font-bold">Formule Mensuelle</p>
+              <div className="flex items-end gap-1 mt-1">
+                <span className="text-3xl font-black">50</span>
+                <span className="font-bold text-lg">$</span>
+                <span className="text-muted-foreground text-sm mb-0.5">/ mois</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Sans engagement</p>
+            </div>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              {['Tous les modules débloqués','Membres & finances','Rapports & statistiques','Cartes (10 $ / unité)','Support prioritaire'].map(f => (
+                <li key={f} className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />{f}</li>
+              ))}
+            </ul>
+            {!sub?.isBranch && selectedPlan === 'monthly' && (
+              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                <CheckCircle className="w-3.5 h-3.5" />
+              </div>
+            )}
+          </div>
+
+          {/* Plan Annuel */}
+          <div
+            className={`relative rounded-xl border-2 p-5 cursor-pointer transition-all space-y-3 ${!sub?.isBranch && selectedPlan === 'annual' ? 'border-primary bg-primary/5 shadow' : 'border-border hover:border-primary/40'} ${sub?.isBranch ? 'opacity-50 pointer-events-none' : ''}`}
+            onClick={() => !sub?.isBranch && setSelectedPlan('annual')}
+          >
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+              <span className="px-3 py-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-black">⭐ RECOMMANDÉ</span>
+            </div>
+            <div className="pt-2">
+              <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-1">Siège d&apos;Église</p>
+              <p className="text-lg font-bold">Formule Annuelle</p>
+              <div className="flex items-end gap-1 mt-1">
+                <span className="text-3xl font-black">100</span>
+                <span className="font-bold text-lg">$</span>
+                <span className="text-muted-foreground text-sm mb-0.5">/ an</span>
+              </div>
+              <p className="text-xs text-emerald-600 font-semibold mt-1">Économisez 500 $ vs mensuel</p>
+            </div>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              {['Tout le plan mensuel','Réseau d\'églises affiliées','Tableau de bord réseau','Cartes (10 $ / unité)','Support dédié 1 an'].map(f => (
+                <li key={f} className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />{f}</li>
+              ))}
+            </ul>
+            {!sub?.isBranch && selectedPlan === 'annual' && (
+              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                <CheckCircle className="w-3.5 h-3.5" />
+              </div>
+            )}
+          </div>
+
+          {/* Plan Affilié */}
+          <div
+            className={`relative rounded-xl border-2 p-5 cursor-pointer transition-all space-y-3 ${sub?.isBranch && selectedPlan === 'annual_branch' ? 'border-primary bg-primary/5 shadow' : 'border-border hover:border-primary/40'} ${!sub?.isBranch ? 'opacity-50 pointer-events-none' : ''}`}
+            onClick={() => sub?.isBranch && setSelectedPlan('annual_branch')}
+          >
+            <div>
+              <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-1">Paroisse Affiliée</p>
+              <p className="text-lg font-bold">Extension Réseau</p>
+              <div className="flex items-end gap-1 mt-1">
+                <span className="text-3xl font-black">30</span>
+                <span className="font-bold text-lg">$</span>
+                <span className="text-muted-foreground text-sm mb-0.5">/ an</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Par paroisse affiliée</p>
+            </div>
+            <ul className="space-y-1.5 text-xs text-muted-foreground">
+              {['Tous les modules complets','Interface admin dédiée','Gestion autonome membres','Cartes (10 $ / unité)','Renouvellement Siège / Solo'].map(f => (
+                <li key={f} className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-primary shrink-0" />{f}</li>
+              ))}
+            </ul>
+            {sub?.isBranch && selectedPlan === 'annual_branch' && (
+              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                <CheckCircle className="w-3.5 h-3.5" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bouton de paiement ── */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-5 flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex-1 text-sm">
+            <p className="font-semibold">
+              {selectedPlan === 'monthly' ? 'Formule Mensuelle — 50 $ / mois'
+               : selectedPlan === 'annual' ? 'Formule Annuelle — 100 $ / an (Recommandée)'
+               : 'Extension Réseau — 30 $ / an'}
+            </p>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Paiement sécurisé via Mobile Money ou Carte Bancaire (GeniusPay).
+              {isActive && ' Renouvellement anticipé possible.'}
+            </p>
+          </div>
+          <Button
+            className="w-full sm:w-auto gap-2 font-bold shrink-0"
+            disabled={paying}
+            onClick={() => handlePay(selectedPlan)}
+          >
+            {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {isActive ? 'Renouveler' : 'Souscrire'} ({selectedPlan === 'monthly' ? '50 $' : selectedPlan === 'annual' ? '100 $' : '30 $'})
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Note cartes ── */}
+      <Card className="border-dashed">
+        <CardContent className="p-4 flex items-start gap-3">
+          <CreditCard className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold">Cartes de membre — Paiement séparé à la demande</p>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Les cartes ne font pas partie de l&apos;abonnement. Chaque carte coûte <strong>10 $ USD</strong> et peut être achetée à tout moment en packs de 20, 60 ou quantité personnalisée, que vous soyez un Siège ou une Paroisse Affiliée.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const auth = useAppStore((s) => s.auth)
   const logout = useAppStore((s) => s.logout)
@@ -668,36 +922,7 @@ export function SettingsPage() {
 
         {/* ==================== ABONNEMENT TAB ==================== */}
         <TabsContent value="abonnement" className="space-y-6">
-          <Card className="overflow-hidden">
-            <div className="relative px-6 py-5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-                    <Zap className="h-7 w-7" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">Plan Gratuit</h2>
-                    <p className="text-sm text-white/80">Accès complet à toutes les fonctionnalités</p>
-                  </div>
-                </div>
-                <Badge className="bg-white/20 text-white border-0">Actif</Badge>
-              </div>
-            </div>
-            <CardContent className="p-6 space-y-4">
-              <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-emerald-500" />
-                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                    Tout est inclus — aucun paiement requis
-                  </p>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                MYCHURCH est entièrement gratuit. Vous avez accès à toutes les fonctionnalités :
-                gestion des membres, finances, événements, présences, rapports, cartes de membres, et plus encore.
-              </p>
-            </CardContent>
-          </Card>
+          <SubscriptionTab />
         </TabsContent>
 
         {/* ==================== THÈME TAB ==================== */}
