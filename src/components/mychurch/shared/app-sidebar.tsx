@@ -29,9 +29,10 @@ import {
   Landmark,
   FolderArchive,
   UserCog,
+  Network,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
-import { CREATOR } from '@/lib/constants'
+import { CREATOR, APP_VERSION } from '@/lib/constants'
 import type { AppView, UserRole } from '@/lib/constants'
 import { canViewFinances, canViewMessages, canViewArchives, canManageUsers } from '@/lib/frontend-rbac'
 import Image from 'next/image'
@@ -46,6 +47,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tableau de bord', icon: LayoutDashboard, view: 'dashboard' },
+  { label: 'Mon Réseau', icon: Network, view: 'network' },
   { label: 'Membres', icon: Users, view: 'members' },
   { label: 'Cartes Membres', icon: CreditCard, view: 'member-cards' },
   { label: 'Finances', icon: DollarSign, view: 'finances' },
@@ -89,7 +91,7 @@ export function AppSidebar() {
                 {auth.churchName || 'MYCHURCH'}
               </span>
               <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-medium leading-none">
-                v1.0
+                v{APP_VERSION}
               </Badge>
             </div>
             <Badge variant="secondary" className="w-fit text-[10px] px-1.5 py-0 h-4 font-normal mt-0.5">
@@ -108,6 +110,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {NAV_ITEMS.filter((item) => {
                 const role = auth.role as UserRole
+                if (item.view === 'network') return role === 'admin'
                 if (item.view === 'finances') return canViewFinances(role)
                 if (item.view === 'messages') return canViewMessages(role)
                 if (item.view === 'archives') return canViewArchives(role)
@@ -157,7 +160,7 @@ export function AppSidebar() {
             <PwaInstallButton />
           </div>
           <p className="text-[10px] text-muted-foreground/70 text-center leading-tight group-data-[collapsible=icon]:hidden">
-            {CREATOR}
+            {CREATOR} • v{APP_VERSION}
           </p>
         </div>
       </SidebarFooter>

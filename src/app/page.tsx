@@ -47,11 +47,12 @@ const AboutPage = dynamic(() => import('@/components/mychurch/dashboard/about-pa
 const DebtsPage = dynamic(() => import('@/components/mychurch/dashboard/debts-page').then(m => ({ default: m.DebtsPage })), { loading: () => <ShellLoader /> })
 const ArchivesPage = dynamic(() => import('@/components/mychurch/dashboard/archives-page').then(m => ({ default: m.ArchivesPage })), { loading: () => <ShellLoader /> })
 const UsersManagementPage = dynamic(() => import('@/components/mychurch/dashboard/users-management-page').then(m => ({ default: m.UsersManagementPage })), { loading: () => <ShellLoader /> })
+const NetworkPage = dynamic(() => import('@/components/mychurch/dashboard/network-page').then(m => ({ default: m.NetworkPage })), { loading: () => <ShellLoader /> })
 
 const DASHBOARD_VIEWS = new Set([
   'dashboard', 'members', 'member-cards', 'finances', 'debts', 'events',
   'attendance', 'messages', 'reports', 'notifications', 'settings', 'about',
-  'archives', 'users-management',
+  'archives', 'users-management', 'network',
 ])
 
 function DashboardView() {
@@ -72,6 +73,7 @@ function DashboardView() {
     case 'about': return <AboutPage />
     case 'archives': return <ArchivesPage />
     case 'users-management': return <UsersManagementPage />
+    case 'network': return <NetworkPage />
     default: return <DashboardPage />
   }
 }

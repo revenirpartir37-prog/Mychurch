@@ -18,7 +18,12 @@ export type AppView =
   | 'settings'
   | 'archives'
   | 'users-management'
+  | 'network'
+  | 'subscription'
   | 'about'
+
+// Application version
+export const APP_VERSION = '0.3.0'
 
 // User roles
 export type UserRole = 'admin' | 'treasurer' | 'secretary' | 'reader'

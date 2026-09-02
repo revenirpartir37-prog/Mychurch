@@ -1,16 +1,17 @@
 'use client'
 
-import { CREATOR } from '@/lib/constants'
+import { CREATOR, APP_VERSION } from '@/lib/constants'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { CheckCircle } from 'lucide-react'
 
 const FEATURES = [
   'Gestion complète des membres',
+  'Réseau multi-églises et paroisses affiliées',
+  'Génération de cartes de membre avec QR Code',
   'Suivi financier multi-devise',
   'Gestion des événements et présences',
   'Système de messagerie interne',
-  'Génération de cartes de membre',
   'Rapports et statistiques détaillées',
   'Notifications en temps réel',
   'Application mobile (PWA)',
@@ -33,7 +34,7 @@ export function AboutPage() {
           {/* App name */}
           <div>
             <h1 className="text-3xl font-bold tracking-tight">MYCHURCH</h1>
-            <p className="text-sm text-muted-foreground mt-1">Version 1.0.0</p>
+            <p className="text-sm font-semibold text-primary mt-1">Version {APP_VERSION}</p>
           </div>
 
           {/* Description */}

@@ -6,6 +6,8 @@ import { AppHeader } from '../shared/app-header'
 import { GlobalSearch } from '../shared/global-search'
 import { NotificationsPrompt } from '../shared/notifications-prompt'
 
+import { SubscriptionGuard } from './subscription-guard'
+
 function SidebarToggleBridge() {
   const { toggleSidebar } = useSidebar()
   return <AppHeader onToggleSidebar={toggleSidebar} />
@@ -17,9 +19,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <SidebarInset>
         <SidebarToggleBridge />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {children}
-        </main>
+        <SubscriptionGuard>
+          <main className="flex-1 overflow-y-auto p-4 md:p-6">
+            {children}
+          </main>
+        </SubscriptionGuard>
         <GlobalSearch />
         <NotificationsPrompt />
       </SidebarInset>
