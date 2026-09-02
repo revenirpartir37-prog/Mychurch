@@ -1,11 +1,10 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { createPayment } from '@/lib/geniuspay'
-import { normalizeCurrencyCode } from '@/lib/currency'
+import { createPayment, usdToXof } from '@/lib/geniuspay'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
-const PRICING = { memberCard: 10, monthly: 50, annual: 100 }
+const PRICING_USD = { memberCard: 10, monthly: 50, annual: 100 }
 
 const initiatePaymentSchema = z.object({
   amount: z.number().positive('Amount must be positive'),
@@ -27,46 +26,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = initiatePaymentSchema.parse(body)
 
-    // Get church info to check currency
-    const church = await db.church.findUnique({
-      where: { id: payload.churchId },
-      select: { currency: true },
-    })
-
-    const targetCurrency = normalizeCurrencyCode(data.currency || church?.currency || 'USD')
-
-    // Determine amount and currency based on targetCurrency
+    // GeniusPay only supports XOF (Ivorian payment gateway)
+    // All internal pricing is in USD, we convert to XOF for GeniusPay
     let finalAmount: number
-    let finalCurrency: string
+    const finalCurrency = 'XOF'
 
-    if (targetCurrency === 'USD') {
-      finalCurrency = 'USD'
-      if (data.paymentType === 'subscription') {
-        finalAmount = data.plan === 'annual' ? PRICING.annual : PRICING.monthly
-      } else {
-        finalAmount = PRICING.memberCard
-      }
-    } else if (targetCurrency === 'CDF') {
-      finalCurrency = 'CDF'
-      const usdAmount = data.paymentType === 'subscription'
-        ? (data.plan === 'annual' ? PRICING.annual : PRICING.monthly)
-        : PRICING.memberCard
-      finalAmount = Math.round(usdAmount * 2800)
-    } else if (targetCurrency === 'EUR') {
-      finalCurrency = 'EUR'
-      if (data.paymentType === 'subscription') {
-        finalAmount = data.plan === 'annual' ? PRICING.annual : PRICING.monthly
-      } else {
-        finalAmount = PRICING.memberCard
-      }
+    if (data.paymentType === 'subscription') {
+      const usdAmount = data.plan === 'annual' ? PRICING_USD.annual : PRICING_USD.monthly
+      finalAmount = usdToXof(usdAmount)
     } else {
-      // Default to USD for any unrecognized currency
-      finalCurrency = 'USD'
-      if (data.paymentType === 'subscription') {
-        finalAmount = data.plan === 'annual' ? PRICING.annual : PRICING.monthly
-      } else {
-        finalAmount = PRICING.memberCard
-      }
+      finalAmount = usdToXof(PRICING_USD.memberCard)
     }
 
     // Get user info for customer details

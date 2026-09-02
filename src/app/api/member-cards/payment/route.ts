@@ -1,6 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { createPayment, getPayment } from '@/lib/geniuspay'
+import { createPayment, getPayment, usdToXof } from '@/lib/geniuspay'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 async function getAuth(request: NextRequest) {
@@ -36,14 +36,6 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Get church info for currency
-    const church = await db.church.findUnique({
-      where: { id: auth.churchId },
-    })
-    if (!church) {
-      return Response.json({ error: 'Church not found' }, { status: 404 })
-    }
-
     // Get member info
     const member = await db.member.findFirst({
       where: { id: data.memberId, churchId: auth.churchId },
@@ -55,21 +47,9 @@ export async function POST(request: NextRequest) {
 
     const usdAmount = 10
 
-    // Determine currency and amount
-    const churchCurrency = church.currency || 'USD'
-    let paymentAmount: number
-    let paymentCurrency: string
-
-    if (churchCurrency === 'USD') {
-      paymentAmount = usdAmount
-      paymentCurrency = 'USD'
-    } else if (churchCurrency === 'FC' || churchCurrency === 'CDF') {
-      paymentAmount = Math.round(usdAmount * 2800)
-      paymentCurrency = 'CDF'
-    } else {
-      paymentAmount = usdAmount
-      paymentCurrency = 'USD'
-    }
+    // GeniusPay only supports XOF
+    const paymentAmount = usdToXof(usdAmount)
+    const paymentCurrency = 'XOF'
 
     // Create payment via GeniusPay
     const origin = request.headers.get('origin') || ''

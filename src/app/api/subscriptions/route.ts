@@ -1,6 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { createPayment, getPayment } from '@/lib/geniuspay'
+import { createPayment, getPayment, usdToXof } from '@/lib/geniuspay'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 async function getAuth(request: NextRequest) {
@@ -94,23 +94,9 @@ export async function POST(request: NextRequest) {
 
     const usdAmount = PLAN_PRICES[data.plan]
 
-    // Determine currency and amount based on church currency
-    const churchCurrency = church.currency || 'USD'
-    let paymentAmount: number
-    let paymentCurrency: string
-
-    if (churchCurrency === 'USD') {
-      paymentAmount = usdAmount
-      paymentCurrency = 'USD'
-    } else if (churchCurrency === 'FC' || churchCurrency === 'CDF') {
-      // CDF: 1 USD = 2800 CDF
-      paymentAmount = Math.round(usdAmount * 2800)
-      paymentCurrency = 'CDF'
-    } else {
-      // XOF and others: use USD directly
-      paymentAmount = usdAmount
-      paymentCurrency = 'USD'
-    }
+    // GeniusPay only supports XOF
+    const paymentAmount = usdToXof(usdAmount)
+    const paymentCurrency = 'XOF'
 
     // Deactivate old active subscriptions
     await db.subscription.updateMany({

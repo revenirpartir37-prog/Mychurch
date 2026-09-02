@@ -1,6 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { createPayment } from '@/lib/geniuspay'
+import { createPayment, usdToXof } from '@/lib/geniuspay'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || ''
 
     const paymentResponse = await createPayment({
-      amount: total,
-      currency: 'USD',
+      amount: usdToXof(total),
+      currency: 'XOF',
       description: `Achat de ${quantity} cartes de membre`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
