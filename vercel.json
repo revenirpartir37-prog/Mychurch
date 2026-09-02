@@ -1,5 +1,4 @@
 {
-  "alias": ["mychurch-taupe.vercel.app"],
   "crons": [
     {
       "path": "/api/notifications/reminders",
