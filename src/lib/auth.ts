@@ -32,7 +32,8 @@ export function isJwtExpired(token: string | null): boolean {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return true
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+    const decoded = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    const payload = JSON.parse(decoded)
     if (!payload.exp) return false
     return Date.now() >= payload.exp * 1000
   } catch {

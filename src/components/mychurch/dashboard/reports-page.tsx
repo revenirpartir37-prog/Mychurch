@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -110,8 +111,11 @@ export function ReportsPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const fetchingRef = useRef(false)
 
   const fetchData = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
       // Charge uniquement les données nécessaires au reportType (évite 300 lignes systématiques)
@@ -120,9 +124,9 @@ export function ReportsPage() {
       const needAttendance = reportType === 'members' || reportType === 'complete'
       const promises: Promise<Response>[] = []
       const keys: string[] = []
-      if (needFinances) { promises.push(fetch('/api/finances?limit=100', { headers: { Authorization: `Bearer ${auth.token}` } })); keys.push('finances') }
-      if (needMembers) { promises.push(fetch('/api/members?limit=100', { headers: { Authorization: `Bearer ${auth.token}` } })); keys.push('members') }
-      if (needAttendance) { promises.push(fetch('/api/attendance?limit=100', { headers: { Authorization: `Bearer ${auth.token}` } })); keys.push('attendance') }
+      if (needFinances) { promises.push(authFetch('/api/finances?limit=100')); keys.push('finances') }
+      if (needMembers) { promises.push(authFetch('/api/members?limit=100')); keys.push('members') }
+      if (needAttendance) { promises.push(authFetch('/api/attendance?limit=100')); keys.push('attendance') }
       const results = await Promise.all(promises)
       const map = new Map(keys.map((k, i) => [k, results[i]]))
       const fRes = map.get('finances')
@@ -143,9 +147,10 @@ export function ReportsPage() {
     } catch {
       toast.error('Erreur de chargement des données')
     } finally {
+      fetchingRef.current = false
       setLoading(false)
     }
-  }, [auth.token, reportType])
+  }, [reportType])
 
   useEffect(() => {
     fetchData()

@@ -30,18 +30,7 @@ export async function GET(request: NextRequest) {
     )
 
     const startOfYear = new Date(new Date().getFullYear(), 0, 1)
-    const [
-      memberCount,
-      eventCount,
-      attendanceCount,
-      church,
-      recentTransactions,
-      recentMembers,
-      auditLogs,
-      upcomingEvents,
-      pendingDebts,
-      totals,
-    ] = await Promise.all([
+    const results = await Promise.allSettled([
       db.member.count({ where: { churchId } }),
       db.event.count({ where: { churchId } }),
       db.attendance.count({ where: { churchId } }),
@@ -87,6 +76,18 @@ export async function GET(request: NextRequest) {
         _sum: { amount: true },
       }),
     ])
+
+    const ok = <T>(r: PromiseSettledResult<T>) => r.status === 'fulfilled' ? r.value : null
+    const memberCount = ok(results[0]) ?? 0
+    const eventCount = ok(results[1]) ?? 0
+    const attendanceCount = ok(results[2]) ?? 0
+    const church = ok(results[3])
+    const recentTransactions = ok(results[4]) ?? []
+    const recentMembers = ok(results[5]) ?? []
+    const auditLogs = ok(results[6]) ?? []
+    const upcomingEvents = ok(results[7]) ?? []
+    const pendingDebts = ok(results[8]) ?? null
+    const totals = ok(results[9]) ?? []
 
     const baseCurrency = normalizeCurrencyCode(church?.currency)
     const baseInitialCapital = church?.initialCapital || 0

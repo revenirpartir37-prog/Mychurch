@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -151,6 +152,7 @@ function MessageStatus({ isMine, isRead }: { isMine: boolean; isRead: boolean })
 
 export function MessagesPage() {
   const { auth } = useAppStore()
+  const fetchingRef = useRef(false)
 
   // All messages (inbox + sent, non-archived)
   const [allMessages, setAllMessages] = useState<Message[]>([])
@@ -182,16 +184,13 @@ export function MessagesPage() {
   /* ─── Data fetching ─── */
 
   const fetchAllMessages = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
-      // Pagination 50 max côté API — évite limit=999 qui charge tout à l'échelle
       const [inboxRes, sentRes] = await Promise.all([
-        fetch('/api/messages?folder=inbox&limit=50', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
-        fetch('/api/messages?folder=sent&limit=50', {
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }),
+        authFetch('/api/messages?folder=inbox&limit=50'),
+        authFetch('/api/messages?folder=sent&limit=50'),
       ])
 
       let inboxMessages: Message[] = []
@@ -221,15 +220,13 @@ export function MessagesPage() {
       toast.error('Erreur de chargement des messages')
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
-  }, [auth.token])
+  }, [])
 
   const fetchMembers = useCallback(async () => {
     try {
-      // Cap 50 — users-management API plafonne à 100
-      const res = await fetch('/api/users-management?limit=50', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/users-management?limit=50')
       if (res.ok) {
         const data = await res.json()
         const users = data.users || data.data || []
@@ -239,7 +236,7 @@ export function MessagesPage() {
     } catch {
       // silent
     }
-  }, [auth.token])
+  }, [auth.userId])
 
   // Fusion des 2 fetchs en un seul état de chargement — évite double skeleton waterfall
   useEffect(() => {
@@ -379,10 +376,9 @@ export function MessagesPage() {
     if (unreadIds.length > 0) {
       Promise.all(
         unreadIds.map((id) =>
-          fetch('/api/messages', {
+          authFetch('/api/messages', {
             method: 'PUT',
             headers: {
-              Authorization: `Bearer ${auth.token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ id, isRead: true }),
@@ -409,12 +405,8 @@ export function MessagesPage() {
 
     setSendingThread(true)
     try {
-      const res = await fetch('/api/messages', {
+      const res = await authFetch('/api/messages', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           receiverId: selectedConversation.peerId,
           subject: selectedConversation.lastMessage.subject || 'Message',
@@ -460,12 +452,8 @@ export function MessagesPage() {
     }
     setSending(true)
     try {
-      const res = await fetch('/api/messages', {
+      const res = await authFetch('/api/messages', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           receiverId: composeTo,
           subject: 'Message',

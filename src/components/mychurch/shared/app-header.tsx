@@ -18,6 +18,7 @@ import { ROLE_LABELS } from '@/lib/constants'
 import type { UserRole } from '@/lib/constants'
 import Image from 'next/image'
 import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
+import { authFetch } from '@/lib/auth-fetch'
 import { oneSignalLogout } from '@/components/mychurch/shared/onesignal-provider'
 
 interface AppHeaderProps {
@@ -55,13 +56,7 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
 
   async function fetchUnreadCount() {
     try {
-      const res = await fetch('/api/notifications?isRead=false&limit=1', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
-      if (res.status === 401) {
-        logout()
-        return
-      }
+      const res = await authFetch('/api/notifications?isRead=false&limit=1')
       if (res.ok) {
         const data = await res.json()
         const count = data.unreadCount ?? (data.notifications ?? data.data ?? []).length

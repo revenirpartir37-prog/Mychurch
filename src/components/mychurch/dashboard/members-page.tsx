@@ -7,6 +7,7 @@ import { CREATOR } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { authFetch } from '@/lib/auth-fetch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -145,6 +146,7 @@ export function MembersPage() {
   const [importing, setImporting] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const fetchingRef = useRef(false)
 
   // Selection mode state
   const [selectionMode, setSelectionMode] = useState(false)
@@ -165,9 +167,7 @@ export function MembersPage() {
   const fetchDepartments = useCallback(async () => {
     setLoadingDeps(true)
     try {
-      const res = await fetch('/api/members?limit=100', {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/members?limit=100')
       if (res.ok) {
         const data = await res.json()
         const allMembers: Member[] = data.members || data.data || []
@@ -187,9 +187,11 @@ export function MembersPage() {
     } finally {
       setLoadingDeps(false)
     }
-  }, [auth.token])
+  }, [])
 
   const fetchMembers = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -201,9 +203,7 @@ export function MembersPage() {
         ...(dateFrom && { startDate: dateFrom }),
         ...(dateTo && { endDate: dateTo }),
       })
-      const res = await fetch(`/api/members?${params}`, {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/members?${params}`)
       if (res.ok) {
         const data = await res.json()
         setMembers(data.members || data.data || [])
@@ -212,9 +212,10 @@ export function MembersPage() {
     } catch (err) {
       console.error(err)
     } finally {
+      fetchingRef.current = false
       setLoading(false)
     }
-  }, [auth.token, search, statusFilter, departmentFilter, page, dateFrom, dateTo])
+  }, [search, statusFilter, departmentFilter, page, dateFrom, dateTo, limit])
 
   const handleExportCSV = async () => {
     setExporting(true)
@@ -227,9 +228,7 @@ export function MembersPage() {
         ...(dateFrom && { startDate: dateFrom }),
         ...(dateTo && { endDate: dateTo }),
       })
-      const res = await fetch(`/api/members?${params}`, {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/members?${params}`)
       if (!res.ok) {
         toast.error('Erreur lors de l\'export')
         return
@@ -329,9 +328,7 @@ export function MembersPage() {
   const handleOpenRegisterLink = async () => {
     setRegisterLinkLoading(true)
     try {
-      const res = await fetch('/api/churches/registration-link', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/churches/registration-link')
       if (res.ok) {
         const data = await res.json()
         setRegisterLink(data.url || '')
@@ -381,10 +378,9 @@ export function MembersPage() {
     try {
       const url = editingMember ? `/api/members?id=${editingMember.id}` : '/api/members'
       const method = editingMember ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -411,9 +407,8 @@ export function MembersPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/members?id=${id}`, {
+      const res = await authFetch(`/api/members?id=${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${auth.token}` },
       })
       if (res.ok) {
         toast.success('Membre supprimé')
@@ -427,10 +422,9 @@ export function MembersPage() {
 
   const handleToggleStatus = async (member: Member) => {
     try {
-      const res = await fetch(`/api/members?id=${member.id}`, {
+      const res = await authFetch(`/api/members?id=${member.id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ status: member.status === 'active' ? 'inactive' : 'active' }),
@@ -482,9 +476,8 @@ export function MembersPage() {
     try {
       const fd = new FormData()
       fd.append('file', importFile)
-      const res = await fetch('/api/members/import', {
+      const res = await authFetch('/api/members/import', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${auth.token}` },
         body: fd,
       })
       if (res.ok) {
@@ -533,10 +526,9 @@ export function MembersPage() {
     setBatchLoading(true)
     try {
       const ids = Array.from(selectedIds)
-      const res = await fetch('/api/members', {
+      const res = await authFetch('/api/members', {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ ids }),
@@ -564,10 +556,9 @@ export function MembersPage() {
       const ids = Array.from(selectedIds)
       let successCount = 0
       for (const id of ids) {
-        const res = await fetch(`/api/members?id=${id}`, {
+        const res = await authFetch(`/api/members?id=${id}`, {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${auth.token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ status }),

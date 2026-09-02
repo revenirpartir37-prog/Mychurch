@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 import { EVENT_LABELS, type EventType } from '@/lib/constants'
+import { authFetch } from '@/lib/auth-fetch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -914,20 +915,16 @@ export function EventsPage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [selectedEvent, setSelectedEvent] = useState<ChurchEvent | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-
-  const headers = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${auth.token}`,
-  }
+  const fetchingRef = useRef(false)
 
   const fetchEvents = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
       const params = new URLSearchParams({ limit: '50' })
       if (pillFilter) params.set('type', pillFilter)
-      const res = await fetch(`/api/events?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/events?${params.toString()}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
       setEvents(data.events || [])
@@ -935,8 +932,9 @@ export function EventsPage() {
       toast.error('Erreur lors du chargement des événements')
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
-  }, [pillFilter, auth.token])
+  }, [pillFilter])
 
   useSupabaseRealtime(['event'], () => fetchEvents(), auth.churchId)
   useEffect(() => {
@@ -991,9 +989,8 @@ export function EventsPage() {
         body.endDate = form.endDate || null
         if (form.location !== undefined) body.location = form.location || null
 
-        const res = await fetch(`/api/events?id=${editingId}`, {
+        const res = await authFetch(`/api/events?id=${editingId}`, {
           method: 'PUT',
-          headers,
           body: JSON.stringify(body),
         })
         if (!res.ok) {
@@ -1003,9 +1000,8 @@ export function EventsPage() {
         toast.success('Événement mis à jour avec succès')
       } else {
         // Create
-        const res = await fetch('/api/events', {
+        const res = await authFetch('/api/events', {
           method: 'POST',
-          headers,
           body: JSON.stringify({
             title: form.title,
             description: form.description || undefined,
@@ -1033,10 +1029,7 @@ export function EventsPage() {
   async function handleDelete(event: ChurchEvent) {
     if (!confirm(`Supprimer l'événement "${event.title}" ?`)) return
     try {
-      const res = await fetch(`/api/events?id=${event.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/events?id=${event.id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error()
       toast.success('Événement supprimé')
       fetchEvents()

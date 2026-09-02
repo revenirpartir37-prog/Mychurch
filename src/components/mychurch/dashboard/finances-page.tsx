@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 import { CREATOR, REVENUE_LABELS, EXPENSE_LABELS, CURRENCY_LABELS, type RevenueCategory, type ExpenseCategory, type Currency, type TransactionLocation } from '@/lib/constants'
 import { normalizeCurrencyCode, currencySymbol } from '@/lib/currency'
+import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -65,6 +66,7 @@ export function FinancesPage() {
   const [members, setMembers] = useState<{ id: string; firstName: string; lastName: string }[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [chartDataLoading, setChartDataLoading] = useState(true)
+  const fetchingRef = useRef(false)
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
   const [exporting, setExporting] = useState(false)
 
@@ -84,6 +86,8 @@ export function FinancesPage() {
   })
 
   const fetchData = useCallback(async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -94,8 +98,8 @@ export function FinancesPage() {
         ...(locationFilter !== 'all' && { location: locationFilter }),
       })
       const [res, mRes] = await Promise.all([
-        fetch(`/api/finances?${params}`, { headers: { 'Authorization': `Bearer ${auth.token}` } }),
-        fetch('/api/members?limit=100', { headers: { 'Authorization': `Bearer ${auth.token}` } }),
+        authFetch(`/api/finances?${params}`),
+        authFetch('/api/members?limit=100'),
       ])
       if (res.ok) {
         const data = await res.json()
@@ -122,8 +126,9 @@ export function FinancesPage() {
       console.error(err)
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
-  }, [auth.token, page, typeFilter, currencyFilter, locationFilter])
+  }, [page, typeFilter, currencyFilter, locationFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -134,9 +139,7 @@ export function FinancesPage() {
   const fetchChartData = useCallback(async () => {
     setChartDataLoading(true)
     try {
-      const res = await fetch('/api/finances?limit=200', {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/finances?limit=200')
       if (res.ok) {
         const data = await res.json()
         setAllTransactions(data.transactions || data.data || [])
@@ -146,7 +149,7 @@ export function FinancesPage() {
     } finally {
       setChartDataLoading(false)
     }
-  }, [auth.token])
+  }, [])
 
   useEffect(() => { fetchChartData() }, [fetchChartData])
 
@@ -161,12 +164,8 @@ export function FinancesPage() {
     setSubmitting(true)
     try {
       const url = editing ? `/api/finances?id=${editing.id}` : '/api/finances'
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method: editing ? 'PUT' : 'POST',
-        headers: {
-          'Authorization': `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           ...form,
           amount: parseFloat(form.amount),
@@ -200,10 +199,7 @@ export function FinancesPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/finances?id=${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/finances?id=${id}`, { method: 'DELETE' })
       if (res.ok) { toast.success('Transaction supprimée'); fetchData() }
     } catch { toast.error('Erreur') }
   }
@@ -345,9 +341,7 @@ export function FinancesPage() {
     setExporting(true)
     try {
       const params = new URLSearchParams({ limit: '999' })
-      const res = await fetch(`/api/finances?${params}`, {
-        headers: { 'Authorization': `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/finances?${params}`)
       if (!res.ok) {
         toast.error('Erreur lors de l\'export')
         return

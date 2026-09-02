@@ -19,32 +19,26 @@ interface AuthState {
 }
 
 interface AppState {
-  // Auth
   auth: AuthState
   setAuth: (auth: Partial<AuthState>) => void
   logout: () => void
+  refreshAccessToken: () => Promise<boolean>
 
-  // Navigation
   currentView: AppView
   setCurrentView: (view: AppView) => void
 
-  // OTP pending verification
   pendingOtpEmail: string | null
   setPendingOtpEmail: (email: string | null) => void
 
-  // Notifications
   unreadCount: number
   setUnreadCount: (count: number) => void
 
-  // Sidebar
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
 
-  // Theme
   theme: 'professional' | 'light' | 'dark'
   setTheme: (theme: 'professional' | 'light' | 'dark') => void
 
-  // Hydration
   hasHydrated: boolean
   setHasHydrated: (v: boolean) => void
 }
@@ -65,24 +59,51 @@ const initialAuth: AuthState = {
   firebaseUid: null,
 }
 
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const decoded = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+let isRefreshing = false
+
+function scheduleRefresh(expiresAt: number) {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  const now = Date.now()
+  const msUntilRefresh = Math.max(0, expiresAt - now - 5 * 60 * 1000)
+  const msMax = expiresAt - now - 30_000
+  const delay = Math.min(msUntilRefresh, Math.max(msMax, 60_000))
+  refreshTimer = setTimeout(async () => {
+    const state = useAppStore.getState()
+    if (state.auth.isAuthenticated && state.auth.refreshToken) {
+      await state.refreshAccessToken()
+    }
+  }, delay)
+}
+
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       auth: initialAuth,
       setAuth: (partial) =>
         set((state) => ({
           auth: {
             ...state.auth,
             ...partial,
-            // Ne modifie isAuthenticated QUE si un token (ou une déconnexion) est explicitement passé.
-            // Une mise à jour partielle (ex. logo) doit préserver l'état de connexion existant.
             isAuthenticated: partial.token !== undefined
               ? !!partial.token
               : state.auth.isAuthenticated,
           },
         })),
+
       logout: () => {
-        // Lazy firebase — évite d'inclure tout le SDK dans le chunk partagé initial
+        if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null }
         import('@/firebase').then(({ auth }) => {
           if (auth) {
             import('firebase/auth').then(({ signOut }) => {
@@ -90,14 +111,41 @@ export const useAppStore = create<AppState>()(
             })
           }
         })
-        set({
-          auth: initialAuth,
-          currentView: 'landing',
-        })
+        set({ auth: initialAuth, currentView: 'landing' })
+      },
+
+      refreshAccessToken: async () => {
+        const { auth } = get()
+        if (!auth.refreshToken || !auth.isAuthenticated) return false
+        if (isRefreshing) return false
+        isRefreshing = true
+        try {
+          const res = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken: auth.refreshToken }),
+          })
+          if (!res.ok) {
+            get().logout()
+            return false
+          }
+          const data = await res.json()
+          set((state) => ({
+            auth: { ...state.auth, token: data.accessToken, refreshToken: data.refreshToken },
+          }))
+          const payload = decodeJwtPayload(data.accessToken)
+          if (payload?.exp) scheduleRefresh(payload.exp * 1000)
+          return true
+        } catch {
+          get().logout()
+          return false
+        } finally {
+          isRefreshing = false
+        }
       },
 
       pendingOtpEmail: null as string | null,
-      setPendingOtpEmail: (email: string | null) => set({ pendingOtpEmail: email }),
+      setPendingOtpEmail: (email) => set({ pendingOtpEmail: email }),
 
       currentView: 'landing',
       setCurrentView: (view) => set({ currentView: view }),
@@ -123,20 +171,21 @@ export const useAppStore = create<AppState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Centralise validation expiration: token expiré → logout propre, évite Bearer expiré
-          try {
-            const tok = state.auth.token
-            if (tok) {
-              const parts = tok.split('.')
-              if (parts.length === 3) {
-                const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-                if (payload.exp && Date.now() >= payload.exp * 1000) {
-                  state.auth = { ...initialAuth }
-                  state.currentView = 'landing'
+          const tok = state.auth.token
+          if (tok && state.auth.isAuthenticated) {
+            const payload = decodeJwtPayload(tok)
+            if (payload?.exp) {
+              if (Date.now() >= payload.exp * 1000) {
+                if (state.auth.refreshToken) {
+                  state.refreshAccessToken()
+                } else {
+                  state.logout()
                 }
+              } else {
+                scheduleRefresh(payload.exp * 1000)
               }
             }
-          } catch {}
+          }
           state.setHasHydrated(true)
         }
       },

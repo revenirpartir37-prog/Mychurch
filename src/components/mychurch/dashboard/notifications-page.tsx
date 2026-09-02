@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -90,9 +91,7 @@ export function NotificationsPage() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetch('/api/notifications', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/notifications')
       if (res.ok) {
         const data = await res.json()
         const list: ChurchNotification[] = data.notifications ?? data.data ?? data ?? []
@@ -117,11 +116,10 @@ export function NotificationsPage() {
     if (!notif || notif.isRead) return
 
     try {
-      const res = await fetch('/api/notifications', {
+      const res = await authFetch('/api/notifications', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.token}`,
         },
         body: JSON.stringify({ ids: [id] }),
       })
@@ -145,11 +143,8 @@ export function NotificationsPage() {
 
     setMarkingAll(true)
     try {
-      const res = await fetch('/api/notifications/mark-all-read', {
+      const res = await authFetch('/api/notifications/mark-all-read', {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-        },
       })
       if (res.ok) {
         setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
@@ -165,9 +160,8 @@ export function NotificationsPage() {
 
   const deleteNotification = async (id: string) => {
     try {
-      const res = await fetch(`/api/notifications?id=${id}`, {
+      const res = await authFetch(`/api/notifications?id=${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${auth.token}` },
       })
       if (res.ok) {
         const removed = notifications.find((n) => n.id === id)

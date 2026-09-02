@@ -38,6 +38,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 
 function formatUsd(amount: number) {
@@ -119,9 +120,7 @@ export function MemberCardsPage() {
   const fetchCredit = useCallback(async () => {
     if (!auth.token) return
     try {
-      const res = await fetch('/api/cards/credit', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/cards/credit')
       if (res.ok) {
         const data = await res.json()
         setCredit(data)
@@ -136,9 +135,7 @@ export function MemberCardsPage() {
   const fetchPendingOrders = useCallback(async () => {
     if (!auth.token) return
     try {
-      const res = await fetch('/api/payments/pending-orders', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/payments/pending-orders')
       if (res.ok) {
         const data = await res.json()
         setPendingOrders(data.orders || [])
@@ -151,10 +148,9 @@ export function MemberCardsPage() {
   const handleCancelOrder = useCallback(async (orderId: string) => {
     setCancellingId(orderId)
     try {
-      const res = await fetch('/api/payments/cancel', {
+      const res = await authFetch('/api/payments/cancel', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ orderId }),
@@ -179,12 +175,8 @@ export function MemberCardsPage() {
       setCardsLoading(true)
       try {
         const [membersRes, cardsRes] = await Promise.all([
-          fetch('/api/members?status=active&limit=200', {
-            headers: { Authorization: `Bearer ${auth.token}` },
-          }),
-          fetch('/api/cards?limit=50', {
-            headers: { Authorization: `Bearer ${auth.token}` },
-          }),
+          authFetch('/api/members?status=active&limit=200'),
+          authFetch('/api/cards?limit=50'),
         ])
 
         if (membersRes.ok) {
@@ -245,10 +237,9 @@ export function MemberCardsPage() {
 
     setGenerating(true)
     try {
-      const res = await fetch('/api/cards', {
+      const res = await authFetch('/api/cards', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ memberId: selectedMemberId }),
@@ -276,10 +267,9 @@ export function MemberCardsPage() {
   async function handlePurchaseCards() {
     setPurchasing(true)
     try {
-      const res = await fetch('/api/payments/card-bundle', {
+      const res = await authFetch('/api/payments/card-bundle', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${auth.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ quantity: purchaseQuantity }),

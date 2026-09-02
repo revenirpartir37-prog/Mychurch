@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { ROLE_LABELS } from '@/lib/constants'
 import type { UserRole } from '@/lib/constants'
 import { toast } from 'sonner'
@@ -140,9 +141,7 @@ export function UsersManagementPage() {
       const params = new URLSearchParams({ page: String(p), limit: String(limit) })
       if (roleFilter !== 'all') params.set('role', roleFilter)
       if (search) params.set('search', search)
-      const res = await fetch(`/api/users-management?${params}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/users-management?${params}`)
       if (res.ok) {
         const data = await res.json()
         setUsers(data.users ?? [])
@@ -162,9 +161,9 @@ export function UsersManagementPage() {
   const handleCreate = async (values: CreateValues) => {
     setSubmitting(true)
     try {
-      const res = await fetch('/api/users-management', {
+      const res = await authFetch('/api/users-management', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       })
       const data = await res.json()
@@ -198,9 +197,9 @@ export function UsersManagementPage() {
     }
     if (values.password) payload.password = values.password
     try {
-      const res = await fetch('/api/users-management', {
+      const res = await authFetch('/api/users-management', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
@@ -221,9 +220,9 @@ export function UsersManagementPage() {
 
   const handleToggleActive = async (user: UserRecord) => {
     try {
-      const res = await fetch('/api/users-management', {
+      const res = await authFetch('/api/users-management', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: user.id, isActive: !user.isActive }),
       })
       if (res.ok) {
@@ -242,9 +241,8 @@ export function UsersManagementPage() {
     if (!deleteUser) return
     setDeleteLoading(true)
     try {
-      const res = await fetch(`/api/users-management?id=${deleteUser.id}`, {
+      const res = await authFetch(`/api/users-management?id=${deleteUser.id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${auth.token}` },
       })
       if (res.ok) {
         toast.success('Utilisateur supprimé')

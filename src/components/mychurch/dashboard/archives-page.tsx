@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -111,9 +112,7 @@ export function ArchivesPage() {
     try {
       const params = new URLSearchParams({ page: String(p), limit: String(limit) })
       if (typeFilter !== 'all') params.set('type', typeFilter)
-      const res = await fetch(`/api/archives?${params}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/archives?${params}`)
       if (res.ok) {
         const data = await res.json()
         setArchives(data.archives ?? [])
@@ -132,9 +131,9 @@ export function ArchivesPage() {
     setCreating(true)
     const period = archiveType === 'annual' ? archiveYear : `${archiveYear}-${archiveMonth}`
     try {
-      const res = await fetch('/api/archives', {
+      const res = await authFetch('/api/archives', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: archiveType, period }),
       })
       const data = await res.json()
@@ -157,9 +156,8 @@ export function ArchivesPage() {
     if (!deleteArchive) return
     setDeleteLoading(true)
     try {
-      const res = await fetch(`/api/archives?id=${deleteArchive.id}`, {
+      const res = await authFetch(`/api/archives?id=${deleteArchive.id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${auth.token}` },
       })
       if (res.ok) {
         toast.success('Archive supprimée')
@@ -180,9 +178,8 @@ export function ArchivesPage() {
     if (!restoreArchive) return
     setRestoreLoading(true)
     try {
-      const res = await fetch(`/api/archives?id=${restoreArchive.id}`, {
+      const res = await authFetch(`/api/archives?id=${restoreArchive.id}`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${auth.token}` },
       })
       const data = await res.json()
       if (res.ok) {

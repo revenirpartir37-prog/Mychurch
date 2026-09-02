@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import type { AttendanceStatus } from '@/lib/constants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -254,16 +255,10 @@ function HeatmapView({ weekOffset, onWeekChange }: { weekOffset: number; onWeekC
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const authHeaders = {
-    Authorization: `Bearer ${auth.token}`,
-  }
-
   const fetchHeatmap = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/attendance/heatmap?weekOffset=${weekOffset}`, {
-        headers: authHeaders,
-      })
+      const res = await authFetch(`/api/attendance/heatmap?weekOffset=${weekOffset}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
       setHeatmapData(data)
@@ -272,11 +267,11 @@ function HeatmapView({ weekOffset, onWeekChange }: { weekOffset: number; onWeekC
     } finally {
       setLoading(false)
     }
-  }, [weekOffset, auth.token])
+  }, [weekOffset])
 
   useEffect(() => {
-    if (auth.token) fetchHeatmap()
-  }, [fetchHeatmap, auth.token])
+    fetchHeatmap()
+  }, [fetchHeatmap])
 
   return (
     <>
@@ -443,30 +438,22 @@ export function AttendancePage() {
   const [viewMode, setViewMode] = useState<'list' | 'heatmap'>('list')
   const [weekOffset, setWeekOffset] = useState(0)
 
-  const authHeaders = {
-    Authorization: `Bearer ${auth.token}`,
-  }
-
   // Fetch active members
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch('/api/members?status=active&limit=200', {
-        headers: authHeaders,
-      })
+      const res = await authFetch('/api/members?status=active&limit=200')
       if (!res.ok) throw new Error()
       const data = await res.json()
       setMembers(data.members || [])
     } catch {
       toast.error('Erreur lors du chargement des membres')
     }
-  }, [auth.token])
+  }, [])
 
   // Fetch events for the selector
   const fetchEvents = useCallback(async () => {
     try {
-      const res = await fetch('/api/events?limit=100', {
-        headers: authHeaders,
-      })
+      const res = await authFetch('/api/events?limit=100')
       if (!res.ok) throw new Error()
       const data = await res.json()
       const list: ChurchEvent[] = data.events || []
@@ -477,11 +464,10 @@ export function AttendancePage() {
     } catch {
       toast.error('Erreur lors du chargement des événements')
     }
-  }, [auth.token, selectedEvent])
+  }, [selectedEvent])
 
   // Load initial data
   useEffect(() => {
-    if (!auth.token) return
     async function init() {
       setLoading(true)
       setDataReady(false)
@@ -489,7 +475,7 @@ export function AttendancePage() {
       setLoading(false)
     }
     init()
-  }, [auth.token, fetchMembers, fetchEvents])
+  }, [fetchMembers, fetchEvents])
 
   // Fetch existing attendance when event+date changes, or when members load
   const fetchExistingAttendance = useCallback(async () => {
@@ -500,9 +486,7 @@ export function AttendancePage() {
         date: selectedDate,
         limit: '200',
       })
-      const res = await fetch(`/api/attendance?${params.toString()}`, {
-        headers: authHeaders,
-      })
+      const res = await authFetch(`/api/attendance?${params.toString()}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
       const existing: Record<string, AttendanceStatus> = {}
@@ -525,7 +509,7 @@ export function AttendancePage() {
       setAttendance(map)
       setDataReady(true)
     }
-  }, [selectedEvent, selectedDate, members, auth.token])
+  }, [selectedEvent, selectedDate, members])
 
   useEffect(() => {
     if (members.length > 0 && selectedEvent) {
@@ -607,9 +591,9 @@ export function AttendancePage() {
         date: selectedDate,
       }))
 
-      const res = await fetch('/api/attendance', {
+      const res = await authFetch('/api/attendance', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(records),
       })
 

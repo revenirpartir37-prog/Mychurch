@@ -1,10 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// Nom de canal GARANTI UNIQUE pour chaque instance de hook.
-// supabase-js dédoublonne les canaux par nom : si deux composants abonnent le même nom,
-// le 2e `.on()` après un `.subscribe()` déjà fait lève
-// "cannot add postgres_changes callbacks ... after subscribe()".
 let channelCounter = 0
 const uniqueId = () => `realtime-${++channelCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
@@ -12,8 +8,8 @@ function normalizeTableName(name: string): string {
   return name.trim().toLowerCase()
 }
 
-// Tables activées sur la publication Realtime.
-// Se déclenche sur INSERT/UPDATE/DELETE et appelle `onChange` (rafraîchit les données).
+const MIN_INTERVAL_MS = 5000
+
 export function useSupabaseRealtime(
   tables: string[],
   onChange: () => void,
@@ -21,13 +17,30 @@ export function useSupabaseRealtime(
 ) {
   const onChangeRef = useRef(onChange)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const lastFireRef = useRef(0)
+  const pendingRef = useRef(false)
   onChangeRef.current = onChange
   const normalizedTables = tables.map(normalizeTableName)
+
+  const throttledFire = useRef(() => {
+    const now = Date.now()
+    const elapsed = now - lastFireRef.current
+    if (elapsed >= MIN_INTERVAL_MS) {
+      lastFireRef.current = now
+      onChangeRef.current()
+    } else if (!pendingRef.current) {
+      pendingRef.current = true
+      setTimeout(() => {
+        pendingRef.current = false
+        lastFireRef.current = Date.now()
+        onChangeRef.current()
+      }, MIN_INTERVAL_MS - elapsed)
+    }
+  }).current
 
   useEffect(() => {
     if (!tables.length || !supabase) return
 
-    // Recrée le canal si filterChurchId/tables change — évite closure stale (lot8)
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current)
       channelRef.current = null
@@ -42,14 +55,14 @@ export function useSupabaseRealtime(
           const rec = (payload.new ?? (payload as any).old) as { churchId?: string } | null
           if (normalizedTables.includes(table)) {
             if (filterChurchId && rec?.churchId && rec.churchId !== filterChurchId) return
-            onChangeRef.current()
+            throttledFire()
           }
         }
       )
       .subscribe((status, err) => {
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn(JSON.stringify({ scope: 'realtime', msg: 'CHANNEL_ERROR', status, err: err ? String(err) : undefined, tables: normalizedTables }))
-          onChangeRef.current()
+          throttledFire()
         }
       })
     channelRef.current = channel

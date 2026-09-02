@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { CREATOR, ROLE_LABELS, CURRENCY_LABELS, type Currency } from '@/lib/constants'
 import { uploadImage } from '@/lib/upload-image'
 import { useTheme } from 'next-themes'
@@ -151,9 +152,7 @@ export function SettingsPage() {
 
   const fetchThresholds = useCallback(async () => {
     try {
-      const res = await fetch('/api/settings/threshold', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/settings/threshold')
       if (res.ok) {
         const data = await res.json()
         setUsdThreshold(String(data.debt_threshold_usd))
@@ -166,9 +165,7 @@ export function SettingsPage() {
 
   const fetchPermissions = useCallback(async () => {
     try {
-      const res = await fetch('/api/settings/permissions', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch('/api/settings/permissions')
       if (res.ok) {
         const data = await res.json()
         setCustomPermissions(data.custom)
@@ -188,11 +185,10 @@ export function SettingsPage() {
   const handleSaveThresholds = async () => {
     setThresholdSaving(true)
     try {
-      const res = await fetch('/api/settings/threshold', {
+      const res = await authFetch('/api/settings/threshold', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.token}`,
         },
         body: JSON.stringify({
           debt_threshold_usd: parseFloat(usdThreshold) || 0,
@@ -225,11 +221,10 @@ export function SettingsPage() {
   const handleSavePermissions = async (role: 'treasurer' | 'secretary' | 'reader') => {
     setPermissionsSaving(true)
     try {
-      const res = await fetch('/api/settings/permissions', {
+      const res = await authFetch('/api/settings/permissions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.token}`,
         },
         body: JSON.stringify({
           role,
@@ -251,9 +246,7 @@ export function SettingsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const meRes = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const meRes = await authFetch('/api/auth/me')
 
       if (meRes.ok) {
         const meData = await meRes.json()
@@ -283,7 +276,7 @@ export function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [auth.token, auth.churchName, refreshPushState])
+  }, [auth.churchName, refreshPushState])
 
   useEffect(() => {
     fetchData()
@@ -298,9 +291,7 @@ export function SettingsPage() {
         limit: String(auditLimit),
         ...(auditActionFilter && { action: auditActionFilter }),
       })
-      const res = await fetch(`/api/audit-logs?${params}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/audit-logs?${params}`)
       if (res.ok) {
         const data = await res.json()
         setAuditLogs(data.logs ?? [])
@@ -311,7 +302,7 @@ export function SettingsPage() {
     } finally {
       setAuditLoading(false)
     }
-  }, [auth.token, auditPage, auditActionFilter, auditLimit])
+  }, [auditPage, auditActionFilter, auditLimit])
 
   useEffect(() => {
     fetchAuditLogs()
@@ -342,11 +333,10 @@ export function SettingsPage() {
     setLogoUploading(true)
     try {
       const url = await uploadImage(file, 'logos', auth.token)
-      await fetch('/api/settings/church-logo', {
+      await authFetch('/api/settings/church-logo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.token}`,
         },
         body: JSON.stringify({ logo: url }),
       })

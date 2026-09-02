@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { authFetch } from '@/lib/auth-fetch'
 import { DEBT_STATUS_LABELS, CURRENCY_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -130,9 +131,7 @@ export function DebtsPage() {
     try {
       const params = new URLSearchParams({ page: String(p), limit: String(limit) })
       if (statusFilter !== 'all') params.set('status', statusFilter)
-      const res = await fetch(`/api/debts?${params}`, {
-        headers: { Authorization: `Bearer ${auth.token}` },
-      })
+      const res = await authFetch(`/api/debts?${params}`)
       if (res.ok) {
         const data = await res.json()
         setDebts(data.debts ?? [])
@@ -151,9 +150,9 @@ export function DebtsPage() {
   const handleCreate = async (values: CreateValues) => {
     setSubmitting(true)
     try {
-      const res = await fetch('/api/debts', {
+      const res = await authFetch('/api/debts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       })
       const data = await res.json()
@@ -180,9 +179,9 @@ export function DebtsPage() {
     setApproveLoading(true)
     const comment = approveForm.getValues('comment')
     try {
-      const res = await fetch('/api/debts', {
+      const res = await authFetch('/api/debts', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ debtId: target.id, action, comment }),
       })
       const data = await res.json()
@@ -206,9 +205,8 @@ export function DebtsPage() {
     if (!deleteDebt) return
     setDeleteLoading(true)
     try {
-      const res = await fetch(`/api/debts?id=${deleteDebt.id}`, {
+      const res = await authFetch(`/api/debts?id=${deleteDebt.id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${auth.token}` },
       })
       if (res.ok) {
         toast.success('Dette supprimée')
