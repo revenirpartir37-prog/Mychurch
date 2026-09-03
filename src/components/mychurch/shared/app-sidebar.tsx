@@ -30,6 +30,7 @@ import {
   FolderArchive,
   UserCog,
   Network,
+  Lock,
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { CREATOR, APP_VERSION } from '@/lib/constants'
@@ -64,7 +65,7 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 export function AppSidebar() {
-  const { currentView, setCurrentView, auth, unreadCount } = useAppStore()
+  const { currentView, setCurrentView, auth, unreadCount, isSubscriptionExpired } = useAppStore()
 
   const fullName = auth.firstName && auth.lastName
     ? `${auth.firstName} ${auth.lastName}`
@@ -118,6 +119,8 @@ export function AppSidebar() {
                 return true
               }).map((item) => {
                 const isActive = currentView === item.view
+                const isRestrictedBySub = isSubscriptionExpired && item.view !== 'dashboard' && item.view !== 'settings' && item.view !== 'about'
+
                 return (
                   <SidebarMenuItem key={item.view}>
                     <div className="relative">
@@ -131,15 +134,19 @@ export function AppSidebar() {
                       <SidebarMenuButton
                         isActive={isActive}
                         onClick={() => setCurrentView(item.view)}
-                        tooltip={item.label}
-                        className={`transition-all duration-200 ${isActive ? 'bg-primary/10' : ''}`}
+                        tooltip={isRestrictedBySub ? `${item.label} (Abonnement requis)` : item.label}
+                        className={`transition-all duration-200 ${isActive ? 'bg-primary/10' : ''} ${isRestrictedBySub ? 'opacity-70' : ''}`}
                       >
                         <item.icon className="h-4 w-4" />
-                        <span className="flex items-center gap-2">{item.label}
+                        <span className="flex items-center justify-between w-full pr-1">
+                          <span className="truncate">{item.label}</span>
                           {item.showBadge && unreadCount > 0 && (
                             <Badge className="h-4 min-w-4 px-1 text-[9px] font-bold bg-destructive text-destructive-foreground hover:bg-destructive leading-none">
                               {unreadCount > 99 ? '99+' : unreadCount}
                             </Badge>
+                          )}
+                          {isRestrictedBySub && (
+                            <Lock className="w-3 h-3 text-amber-500/80 shrink-0 ml-1" />
                           )}
                         </span>
                       </SidebarMenuButton>

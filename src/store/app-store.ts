@@ -41,6 +41,9 @@ interface AppState {
 
   hasHydrated: boolean
   setHasHydrated: (v: boolean) => void
+
+  isSubscriptionExpired: boolean
+  setIsSubscriptionExpired: (expired: boolean) => void
 }
 
 const initialAuth: AuthState = {
@@ -161,6 +164,9 @@ export const useAppStore = create<AppState>()(
 
       hasHydrated: false,
       setHasHydrated: (v) => set({ hasHydrated: v }),
+
+      isSubscriptionExpired: false,
+      setIsSubscriptionExpired: (expired) => set({ isSubscriptionExpired: expired }),
     }),
     {
       name: 'mychurch-storage',

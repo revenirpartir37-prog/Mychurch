@@ -51,20 +51,34 @@ export async function GET(request: NextRequest) {
     const isBranch = !!church.parentId
     const isHeadquarters = !isBranch
 
-    const subscription = await db.subscription.findFirst({
-      where: { churchId: auth.churchId },
+    // 1. Chercher prioritairement un abonnement actif (payant, à vie ou essai en cours)
+    let subscription = await db.subscription.findFirst({
+      where: {
+        churchId: auth.churchId,
+        status: 'active',
+        paymentStatus: 'completed',
+      },
       orderBy: { createdAt: 'desc' },
     })
 
-    // Vérification de paiement en attente (auto-check sur GeniusPay)
+    // 2. Si aucun actif, vérifier s'il y a un abonnement récent (en attente ou expiré)
+    if (!subscription) {
+      subscription = await db.subscription.findFirst({
+        where: { churchId: auth.churchId },
+        orderBy: { createdAt: 'desc' },
+      })
+    }
+
+    // Vérification automatique de paiement en attente (auto-check sur GeniusPay)
     if (subscription?.paymentStatus === 'pending' && subscription.paymentRef) {
       try {
         const paymentResponse = await getPayment(subscription.paymentRef)
         if (paymentResponse.success && paymentResponse.data?.status === 'completed') {
-          await db.subscription.update({
+          const updated = await db.subscription.update({
             where: { id: subscription.id },
             data: { paymentStatus: 'completed', status: 'active' },
           })
+          subscription = updated
         }
       } catch {
         // En cas d'erreur de vérification, continuer
@@ -76,7 +90,7 @@ export async function GET(request: NextRequest) {
     let canAccess = true
 
     if (!subscription) {
-      // Nouvelle église ou compte existant sans abonnement : octroi de 7 jours d'essai gratuit
+      // Première visite sans abonnement : octroi automatique de 7 jours d'essai gratuit
       const trialEndDate = new Date()
       trialEndDate.setDate(trialEndDate.getDate() + 7)
 
@@ -90,6 +104,7 @@ export async function GET(request: NextRequest) {
           amount: 0,
           currency: 'USD',
           paymentStatus: 'completed',
+          paymentRef: `TRIAL-AUTO-${Date.now()}`,
         },
       })
 
@@ -107,18 +122,13 @@ export async function GET(request: NextRequest) {
     if (subscription.plan === 'lifetime') {
       isExpired = false
       canAccess = true
-    } else if (subscription.status !== 'active' || subscription.paymentStatus !== 'completed') {
-      isExpired = true
-      canAccess = isHeadquarters
-    } else {
+    } else if (subscription.status === 'active' && subscription.paymentStatus === 'completed') {
       const isPast = new Date(subscription.endDate) < now
       isExpired = isPast
-
-      if (isBranch) {
-        canAccess = !isExpired
-      } else {
-        canAccess = true
-      }
+      canAccess = !isExpired
+    } else {
+      isExpired = true
+      canAccess = false
     }
 
     return Response.json({
@@ -174,18 +184,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Plan invalide' }, { status: 400 })
     }
 
-    // Affichage et facturation directs en USD sur GeniusPay
+    // Facturation directe en USD
     const paymentAmount = usdAmount
     const paymentCurrency = 'USD'
-
-    // Désactiver les anciens abonnements
-    await db.subscription.updateMany({
-      where: {
-        churchId: targetChurchId,
-        status: 'active',
-      },
-      data: { status: 'expired' },
-    })
 
     const startDate = new Date()
     const endDate = new Date()
