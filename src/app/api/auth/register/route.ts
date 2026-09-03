@@ -72,22 +72,6 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Create free trial subscription (7 days)
-    const trialEndDate = new Date()
-    trialEndDate.setDate(trialEndDate.getDate() + 7)
-    await db.subscription.create({
-      data: {
-        churchId: church.id,
-        plan: 'trial',
-        status: 'active',
-        startDate: new Date(),
-        endDate: trialEndDate,
-        amount: 0,
-        currency: data.currency,
-        paymentStatus: 'completed',
-      },
-    })
-
     // Create default church settings
     const defaultSettings = [
       { key: 'primaryColor', value: '#6366f1' },

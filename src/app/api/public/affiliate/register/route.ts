@@ -74,10 +74,10 @@ export async function POST(request: NextRequest) {
     }
 
     const parentSub = parentChurch.subscriptions[0]
-    const isParentActive = parentSub && new Date(parentSub.endDate) > new Date()
+    const isParentActive = parentSub && parentSub.plan !== 'trial' && new Date(parentSub.endDate) > new Date()
     if (!isParentActive) {
       return Response.json({
-        error: 'Le Siège de votre réseau doit avoir un abonnement actif (50 $ / mois ou 100 $ / an) pour enregistrer de nouvelles églises affiliées.',
+        error: 'Le Siège de votre réseau doit avoir un abonnement actif (50 $ / mois ou 100 $ / an) pour enregistrer de nouvelles églises affiliées (non disponible en essai gratuit).',
       }, { status: 403 })
     }
 
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     const paymentResponse = await createPayment({
       amount: 30,
       currency: 'USD',
-      description: `Affiliation Réseau MyChurch (30 USD) - ${data.churchName}`,
+      description: `30.00 $ USD - Affiliation Réseau Paroisse MYCHURCH (${data.churchName})`,
       customer: {
         name: `${data.adminFirstName} ${data.adminLastName}`,
         email: data.adminEmail,

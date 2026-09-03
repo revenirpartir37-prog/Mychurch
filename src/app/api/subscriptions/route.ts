@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
     const paymentParams: any = {
       amount: paymentAmount,
       currency: paymentCurrency,
-      description: `MYCHURCH abonnement ${data.plan} (${paymentAmount} USD) - ${targetChurch.name}`,
+      description: `${paymentAmount}.00 $ USD - Abonnement ${data.plan === 'monthly' ? 'Mensuel' : 'Annuel'} MYCHURCH (${targetChurch.name})`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,

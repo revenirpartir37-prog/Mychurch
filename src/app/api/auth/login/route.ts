@@ -101,21 +101,43 @@ export async function POST(request: NextRequest) {
       db.user.update({ where: { id: user.id }, data: { firebaseUid: supabaseUid } }).catch(() => {})
     }
 
-    // Check subscription status (non-blocking if fails)
+    // Check subscription status & trigger 7-day free trial on FIRST LOGIN
     let subscription: Awaited<ReturnType<typeof db.subscription.findFirst>> = null
     try {
       subscription = await db.subscription.findFirst({
         where: { churchId: church.id },
         orderBy: { createdAt: 'desc' },
       })
-    } catch {
-      // Non-blocking
+
+      // Première connexion : activation de l'essai gratuit de 7 jours
+      if (!subscription) {
+        const now = new Date()
+        const trialEndDate = new Date(now)
+        trialEndDate.setDate(trialEndDate.getDate() + 7)
+
+        subscription = await db.subscription.create({
+          data: {
+            churchId: church.id,
+            plan: 'trial',
+            status: 'active',
+            startDate: now,
+            endDate: trialEndDate,
+            amount: 0,
+            currency: 'USD',
+            paymentStatus: 'completed',
+            paymentRef: `TRIAL-LOGIN-${Date.now()}`,
+          },
+        })
+      }
+      // Deuxième connexion ou ultérieure : le compte à rebours continue sans être réinitialisé
+    } catch (err) {
+      console.error('Subscription check on login error:', err)
     }
 
     const isSubscriptionExpired =
       !subscription ||
       subscription.status !== 'active' ||
-      subscription.endDate < new Date()
+      (subscription.plan !== 'lifetime' && new Date(subscription.endDate) < new Date())
 
     // Update last login (non-blocking)
     db.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } }).catch(() => {})
