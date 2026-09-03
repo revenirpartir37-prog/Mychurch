@@ -72,9 +72,9 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Create trial subscription (30 days)
+    // Create free trial subscription (7 days)
     const trialEndDate = new Date()
-    trialEndDate.setDate(trialEndDate.getDate() + 30)
+    trialEndDate.setDate(trialEndDate.getDate() + 7)
     await db.subscription.create({
       data: {
         churchId: church.id,

@@ -40,6 +40,7 @@ import {
   Clock,
   CheckCircle2,
   Sparkles,
+  KeyRound,
 } from 'lucide-react'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -189,6 +190,9 @@ function SubscriptionTab() {
 
   const countdown = useSubscriptionCountdown(sub?.subscription?.endDate)
 
+  const [adminCode, setAdminCode] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
+
   const handlePay = async (plan: 'monthly' | 'annual' | 'annual_branch') => {
     setPaying(true)
     try {
@@ -204,15 +208,52 @@ function SubscriptionTab() {
     finally { setPaying(false) }
   }
 
+  const handleRedeemCode = async () => {
+    if (!adminCode.trim()) {
+      toast.error('Veuillez saisir le code administrateur')
+      return
+    }
+    setRedeeming(true)
+    try {
+      const res = await authFetch('/api/subscriptions/redeem-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: adminCode.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success(data.message || 'Abonnement à vie activé !')
+        setSub((prev) => prev ? {
+          ...prev,
+          isExpired: false,
+          canAccess: true,
+          subscription: data.subscription,
+        } : null)
+        setAdminCode('')
+      } else {
+        toast.error(data.error || 'Code administrateur incorrect')
+      }
+    } catch {
+      toast.error('Erreur lors de la validation du code')
+    } finally {
+      setRedeeming(false)
+    }
+  }
+
   const planLabel = (plan?: string) => {
     if (!plan) return '—'
+    if (plan === 'lifetime') return '👑 Abonnement à Vie (VIP Admin)'
+    if (plan === 'trial') return '🎁 Essai Gratuit (7 Jours)'
     if (plan === 'annual') return 'Annuel Siège (100 $ / an)'
     if (plan === 'monthly') return 'Mensuel Siège (50 $ / mois)'
     if (plan === 'annual_branch') return 'Paroisse Affiliée (30 $ / an)'
     return plan
   }
 
-  const endDateFmt = (d?: string) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
+  const endDateFmt = (d?: string, plan?: string) => {
+    if (plan === 'lifetime') return 'À vie (Illimité)'
+    return d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
+  }
 
   if (loading) return (
     <div className="space-y-4">
@@ -277,7 +318,7 @@ function SubscriptionTab() {
               </div>
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Expiration</p>
-                <p className="font-semibold">{endDateFmt(sub.subscription.endDate)}</p>
+                <p className="font-semibold">{endDateFmt(sub.subscription.endDate, sub.subscription.plan)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Type</p>
@@ -285,8 +326,30 @@ function SubscriptionTab() {
               </div>
             </div>
 
-            {/* Compte à rebours en temps réel */}
-            {isActive && (
+            {/* Compte à rebours ou Statut à vie */}
+            {isActive && sub.subscription.plan === 'lifetime' ? (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-500">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                      Privilège Administrateur
+                    </p>
+                    <p className="text-xl font-bold text-foreground">
+                      Abonnement Permanent à Vie Activé
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Accès complet et gratuit à l&apos;application. Seuls l&apos;affiliation et les cartes restent payants.
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs font-bold shrink-0">
+                  👑 Illimité
+                </Badge>
+              </div>
+            ) : isActive ? (
               <div className="p-4 rounded-xl bg-muted/50 border border-primary/20 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
@@ -305,7 +368,7 @@ function SubscriptionTab() {
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Actif en direct
                 </Badge>
               </div>
-            )}
+            ) : null}
           </CardContent>
         )}
       </Card>
@@ -425,6 +488,46 @@ function SubscriptionTab() {
             {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {isActive ? 'Renouveler' : 'Souscrire'} ({selectedPlan === 'monthly' ? '50 $' : selectedPlan === 'annual' ? '100 $' : '30 $'})
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Activation Code Secret Admin pour Abonnement à Vie ── */}
+      <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-transparent to-transparent shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-amber-500" />
+            Code Administrateur pour Abonnement à Vie
+          </CardTitle>
+          <CardDescription className="text-xs text-muted-foreground leading-relaxed">
+            Tapez le code administrateur s&apos;il vous a été accordé pour débloquer un abonnement permanent à vie.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              placeholder="Saisir le code secret administrateur..."
+              value={adminCode}
+              onChange={(e) => setAdminCode(e.target.value)}
+              className="font-mono text-xs uppercase"
+            />
+            <Button
+              onClick={handleRedeemCode}
+              disabled={redeeming || !adminCode.trim()}
+              className="bg-amber-600 hover:bg-amber-500 text-white font-bold gap-2 text-xs shrink-0"
+            >
+              {redeeming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Valider le code
+            </Button>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-300 space-y-1.5">
+            <p className="font-semibold flex items-center gap-1.5 text-foreground">
+              <Info className="w-4 h-4 text-amber-500 shrink-0" /> Précision importante sur l&apos;abonnement à vie :
+            </p>
+            <p className="leading-relaxed">
+              Dans cet abonnement à vie, vous pourrez <strong>tout utiliser gratuitement</strong> dans l&apos;application sans aucune limite de temps. La seule chose qui reste payante, c&apos;est <strong>l&apos;affiliation de nouvelles églises</strong> (50 $ / mois ou 100 $ / an pour ouvrir le réseau) et <strong>la commande des cartes de membres</strong> (10 $ / carte).
+            </p>
+          </div>
         </CardContent>
       </Card>
 

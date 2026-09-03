@@ -75,9 +75,41 @@ export async function GET(request: NextRequest) {
     let isExpired = false
     let canAccess = true
 
-    if (!subscription || subscription.status !== 'active' || subscription.paymentStatus !== 'completed') {
+    if (!subscription) {
+      // Nouvelle église ou compte existant sans abonnement : octroi de 7 jours d'essai gratuit
+      const trialEndDate = new Date()
+      trialEndDate.setDate(trialEndDate.getDate() + 7)
+
+      const trialSub = await db.subscription.create({
+        data: {
+          churchId: auth.churchId,
+          plan: 'trial',
+          status: 'active',
+          startDate: new Date(),
+          endDate: trialEndDate,
+          amount: 0,
+          currency: 'USD',
+          paymentStatus: 'completed',
+        },
+      })
+
+      return Response.json({
+        subscription: trialSub,
+        isBranch,
+        isHeadquarters,
+        isExpired: false,
+        canAccess: true,
+        churchName: church.name,
+        parentName: church.parent?.name,
+      })
+    }
+
+    if (subscription.plan === 'lifetime') {
+      isExpired = false
+      canAccess = true
+    } else if (subscription.status !== 'active' || subscription.paymentStatus !== 'completed') {
       isExpired = true
-      canAccess = isHeadquarters 
+      canAccess = isHeadquarters
     } else {
       const isPast = new Date(subscription.endDate) < now
       isExpired = isPast
