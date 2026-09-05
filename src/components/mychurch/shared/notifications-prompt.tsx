@@ -12,38 +12,37 @@ import { toast } from 'sonner'
 import { Bell, X, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-const DISMISS_KEY = 'mychurch:notifyDismissedAt'
-const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 jours
+const PROMPT_HANDLED_KEY = 'mychurch:notifications_prompt_handled'
 
-function isDismissedRecently(): boolean {
-  try {
-    const raw = localStorage.getItem(DISMISS_KEY)
-    if (!raw) return false
-    const ts = Number(raw)
-    return Number.isFinite(ts) && Date.now() - ts < DISMISS_TTL_MS
-  } catch {
-    return false
-  }
-}
-
-// Demande d'autorisation des notifications push à la première connexion / inscription.
-// S'affiche tant que l'utilisateur n'a pas accepté, avec cooldown 7j après "Plus tard".
 export function NotificationsPrompt() {
   const isAuthenticated = useAppStore((s) => s.auth.isAuthenticated)
   const [visible, setVisible] = useState(false)
   const [checking, setChecking] = useState(true)
-
   const [activating, setActivating] = useState(false)
 
   const checkSubscription = useCallback(async () => {
+    if (typeof window === 'undefined') return
+    // Si déjà manipulé par l'utilisateur, ne plus jamais l'embêter
+    try {
+      if (localStorage.getItem(PROMPT_HANDLED_KEY) === 'true') {
+        setVisible(false)
+        setChecking(false)
+        return
+      }
+    } catch {}
+
+    // Si les notifications sont déjà accordées ou refusées par le navigateur
+    if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+        setVisible(false)
+        setChecking(false)
+        return
+      }
+    }
+
     const subscribed = await isSubscribed()
     setChecking(false)
     if (subscribed) {
-      try { localStorage.removeItem(DISMISS_KEY) } catch {}
-      setVisible(false)
-      return
-    }
-    if (isDismissedRecently()) {
       setVisible(false)
       return
     }
@@ -56,7 +55,6 @@ export function NotificationsPrompt() {
       setChecking(true)
       return
     }
-    // Préchauffe le SDK puis vérifie l'abonnement réel.
     void getOneSignal()
     const t = setTimeout(() => void checkSubscription(), 1500)
     return () => clearTimeout(t)
@@ -64,27 +62,27 @@ export function NotificationsPrompt() {
 
   async function handleAllow() {
     setActivating(true)
+    // Marquer immédiatement comme géré pour éviter toute réapparition intempestive
+    try { localStorage.setItem(PROMPT_HANDLED_KEY, 'true') } catch {}
+
     try {
       await requestPushPermission()
       toast.success('Notifications activées. Bienvenue sur MYCHURCH !')
-      try { localStorage.removeItem(DISMISS_KEY) } catch {}
-      setVisible(false)
     } catch (error) {
       const permission = await getPushPermissionState()
       if (permission === 'denied') {
-        toast.error('Notifications bloquées. Activez-les dans les paramètres du navigateur.')
+        toast.info('Notifications bloquées par le navigateur. Vous pourrez les autoriser dans Paramètres.')
       } else {
-        toast.error(error instanceof Error ? error.message : 'Impossible d’activer les notifications')
+        toast.info('Vous pourrez réactiver les notifications à tout moment dans Paramètres.')
       }
-      const subscribed = await isSubscribed()
-      setVisible(!subscribed)
     } finally {
       setActivating(false)
+      setVisible(false)
     }
   }
 
   function handleDismiss() {
-    try { localStorage.setItem(DISMISS_KEY, String(Date.now())) } catch {}
+    try { localStorage.setItem(PROMPT_HANDLED_KEY, 'true') } catch {}
     setVisible(false)
   }
 

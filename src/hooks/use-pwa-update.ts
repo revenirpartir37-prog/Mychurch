@@ -14,70 +14,63 @@ export function usePWAUpdate(): PWANotificationState {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false)
   const [version, setVersion] = useState<string | null>(null)
 
+  const isHandled = useCallback(() => {
+    if (typeof window === 'undefined') return true
+    try {
+      return sessionStorage.getItem('pwa_update_handled') === APP_VERSION
+    } catch {
+      return false
+    }
+  }, [])
+
   const triggerUpdate = useCallback((v?: string) => {
+    if (isHandled()) return
     setIsUpdateAvailable(true)
     setVersion(v ?? APP_VERSION)
-  }, [])
+  }, [isHandled])
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
+    if (isHandled()) return
 
-    // 1. Listen for postMessage from the activated SW
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'SW_UPDATE_AVAILABLE') {
-        triggerUpdate(event.data.version)
-      }
-    }
-    navigator.serviceWorker.addEventListener('message', handleMessage)
-    window.addEventListener('message', handleMessage)
-
-    // 2. Detect a waiting SW (already installed in background)
     navigator.serviceWorker.ready.then((registration) => {
-      if (registration.waiting) {
+      // Détecter si un nouveau SW est déjà en attente
+      if (registration.waiting && navigator.serviceWorker.controller) {
         triggerUpdate()
       }
 
-      // 3. Listen for a new SW being found after page load
+      // Écouter l'arrivée d'un nouveau SW
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing
         if (!newWorker) return
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // A new SW is installed and waiting — show the banner
             triggerUpdate()
           }
         })
       })
     })
-
-    // 4. Periodically check for SW updates (every 30 min)
-    const interval = setInterval(() => {
-      navigator.serviceWorker.ready.then((reg) => reg.update())
-    }, 30 * 60 * 1000)
-
-    return () => {
-      navigator.serviceWorker.removeEventListener('message', handleMessage)
-      window.removeEventListener('message', handleMessage)
-      clearInterval(interval)
-    }
-  }, [triggerUpdate])
+  }, [triggerUpdate, isHandled])
 
   const dismiss = useCallback(() => {
+    try {
+      sessionStorage.setItem('pwa_update_handled', APP_VERSION)
+    } catch {}
     setIsUpdateAvailable(false)
   }, [])
 
   const update = useCallback(() => {
+    try {
+      sessionStorage.setItem('pwa_update_handled', APP_VERSION)
+    } catch {}
     setIsUpdateAvailable(false)
-    if (typeof window !== 'undefined') {
-      ;(window as any).__PWA_MANUAL_RELOAD__ = true
-    }
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready
         .then((registration) => {
           if (registration.waiting) {
             registration.waiting.postMessage({ type: 'SKIP_WAITING' })
           }
-          registration.update().catch(() => {})
         })
         .finally(() => {
           setTimeout(() => {

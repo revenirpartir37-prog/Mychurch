@@ -82,7 +82,7 @@ export function getOneSignal(): Promise<OneSignalInstance | null> {
           try {
             os.init({
               appId,
-              notifyButton: { enable: true },
+              notifyButton: { enable: false },
               welcomeNotification: {
                 title: 'MYCHURCH',
                 message: 'Bienvenue sur MYCHURCH !',

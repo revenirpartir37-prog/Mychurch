@@ -21,12 +21,6 @@ self.addEventListener('activate', (event) => {
       )
     )
   )
-  // Notify open tabs that a new version is ready (without forcing an unexpected reload)
-  self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((clients) => {
-    clients.forEach((client) =>
-      client.postMessage({ type: 'SW_UPDATE_AVAILABLE', version: APP_VERSION })
-    )
-  })
 })
 
 // Listen for messages from clients
