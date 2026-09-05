@@ -254,9 +254,8 @@ export default function AffiliateJoinPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="CDF">Franc Congolais (CDF)</SelectItem>
+                        <SelectItem value="CDF">Franc Congolais (FC)</SelectItem>
                         <SelectItem value="EUR">Euro (€)</SelectItem>
-                        <SelectItem value="XOF">FCFA (XOF)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

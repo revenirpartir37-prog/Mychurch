@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     const paymentResponse = await createPayment({
       amount: 30,
       currency: 'USD',
-      description: `30.00 $ USD - Affiliation Réseau Paroisse MYCHURCH (${data.churchName})`,
+      description: `[30 $ USD] Frais d'affiliation Réseau Paroisse MYCHURCH (${data.churchName})`,
       customer: {
         name: `${data.adminFirstName} ${data.adminLastName}`,
         email: data.adminEmail,

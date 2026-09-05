@@ -1005,7 +1005,7 @@ export function MemberCardsPage() {
             </div>
 
             <p className="text-xs text-muted-foreground text-center">
-              Paiement sécurisé via GeniusPay (Wave, Orange Money, MTN, Moov, Visa/Mastercard)
+              Facturation en Dollars USD (10 $ USD / carte). Paiement sécurisé via GeniusPay (Wave, Orange Money, MTN, Moov, Visa/Mastercard) avec conversion automatique en devise de paiement locale.
             </p>
           </div>
 

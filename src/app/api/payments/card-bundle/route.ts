@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const paymentResponse = await createPayment({
       amount: total,
       currency: 'USD',
-      description: `Achat de ${quantity} cartes de membre (${total} USD)`,
+      description: `[${total} $ USD] Commande de ${quantity} carte(s) de membre MYCHURCH (${quantity} × 10 $ USD)`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,

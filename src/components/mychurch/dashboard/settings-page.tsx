@@ -477,7 +477,7 @@ function SubscriptionTab() {
                : 'Extension Réseau — 30 $ / an'}
             </p>
             <p className="text-muted-foreground text-xs mt-0.5">
-              Paiement sécurisé via Mobile Money ou Carte Bancaire (GeniusPay).
+              Facturation officielle en Dollars USD ({selectedPlan === 'monthly' ? '50 $ USD' : selectedPlan === 'annual' ? '100 $ USD' : '30 $ USD'}). Sur la passerelle sécurisée GeniusPay, l&apos;équivalent en devise de paiement locale (XOF / Mobile Money) est affiché pour débiter votre compte.
               {isActive && ' Renouvellement anticipé possible.'}
             </p>
           </div>
