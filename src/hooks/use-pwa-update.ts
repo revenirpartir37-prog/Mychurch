@@ -68,6 +68,9 @@ export function usePWAUpdate(): PWANotificationState {
 
   const update = useCallback(() => {
     setIsUpdateAvailable(false)
+    if (typeof window !== 'undefined') {
+      ;(window as any).__PWA_MANUAL_RELOAD__ = true
+    }
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready
         .then((registration) => {

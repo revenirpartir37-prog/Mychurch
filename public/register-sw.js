@@ -1,10 +1,10 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
-      // Check for updates periodically
-      setInterval(() => {
-        registration.update()
-      }, 60 * 1000) // Every 60 seconds
+      // Check for updates on window focus, NOT in a destructive 60-second loop
+      window.addEventListener('focus', () => {
+        registration.update().catch(() => {})
+      })
 
       // Listen for new service worker installing
       registration.addEventListener('updatefound', () => {
@@ -12,7 +12,7 @@ if ('serviceWorker' in navigator) {
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New content available, notify the app
+              // New content available, notify the app banner without reloading
               window.postMessage({ type: 'SW_UPDATE_AVAILABLE' }, '*')
             }
           })
@@ -29,11 +29,10 @@ if ('serviceWorker' in navigator) {
       }
     })
 
-    // When a new SW takes over, reload the page
-    let refreshing = false
+    // Ne JAMAIS recharger la page à l'improviste !
+    // Le rechargement est UNIQUEMENT autorisé si l'utilisateur a cliqué pour mettre à jour.
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) {
-        refreshing = true
+      if (window.__PWA_MANUAL_RELOAD__) {
         window.location.reload()
       }
     })

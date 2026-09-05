@@ -133,7 +133,9 @@ export const useAppStore = create<AppState>()(
             body: JSON.stringify({ refreshToken: auth.refreshToken }),
           })
           if (!res.ok) {
-            get().logout()
+            if (res.status === 401 || res.status === 403) {
+              get().logout()
+            }
             return false
           }
           const data = await res.json()
@@ -144,7 +146,7 @@ export const useAppStore = create<AppState>()(
           if (payload?.exp) scheduleRefresh(payload.exp * 1000)
           return true
         } catch {
-          get().logout()
+          // Erreur réseau ou latence temporaire : ne jamais déconnecter brutalement
           return false
         } finally {
           isRefreshing = false
