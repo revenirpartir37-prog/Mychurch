@@ -19,6 +19,8 @@ import {
   Users,
   CreditCard,
   DollarSign,
+  Banknote,
+  Euro,
   Calendar,
   ClipboardCheck,
   Mail,
@@ -121,6 +123,14 @@ export function AppSidebar() {
                 const isActive = currentView === item.view
                 const isRestrictedBySub = isSubscriptionExpired && item.view !== 'dashboard' && item.view !== 'settings' && item.view !== 'about'
 
+                const FinanceIcon = (auth.currencySymbol === 'FC' || auth.churchCurrency === 'CDF')
+                  ? Banknote
+                  : (auth.currencySymbol === '€' || auth.churchCurrency === 'EUR')
+                  ? Euro
+                  : DollarSign
+
+                const Icon = item.view === 'finances' ? FinanceIcon : item.icon
+
                 return (
                   <SidebarMenuItem key={item.view}>
                     <div className="relative">
@@ -137,7 +147,7 @@ export function AppSidebar() {
                         tooltip={isRestrictedBySub ? `${item.label} (Abonnement requis)` : item.label}
                         className={`transition-all duration-200 ${isActive ? 'bg-primary/10' : ''} ${isRestrictedBySub ? 'opacity-70' : ''}`}
                       >
-                        <item.icon className="h-4 w-4" />
+                        <Icon className="h-4 w-4" />
                         <span className="flex items-center justify-between w-full pr-1">
                           <span className="truncate">{item.label}</span>
                           {item.showBadge && unreadCount > 0 && (

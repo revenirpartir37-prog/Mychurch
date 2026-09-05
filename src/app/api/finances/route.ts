@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
       refNum = refNum.startsWith('REF-') ? refNum : `REF-${cleanRef.padStart(6, '0')}`
     }
 
+    const safeDate = data.date ? new Date(data.date) : new Date()
     const transaction = await db.transaction.create({
       data: {
         churchId: auth.churchId,
@@ -239,7 +240,7 @@ export async function POST(request: NextRequest) {
         currency: targetCurrency,
         location: data.location,
         description: data.description || null,
-        date: data.date ? new Date(data.date) : new Date(),
+        date: isNaN(safeDate.getTime()) ? new Date() : safeDate,
         memberId: data.memberId || null,
         recordedByName: data.recordedByName || null,
         beneficiary: data.beneficiary || null,
@@ -250,7 +251,7 @@ export async function POST(request: NextRequest) {
       include: { member: { select: { id: true, firstName: true, lastName: true } } },
     })
 
-    // Log audit
+    // Log audit (non-bloquant)
     createAuditLog({
       churchId: auth.churchId,
       userId: auth.userId,
@@ -258,22 +259,24 @@ export async function POST(request: NextRequest) {
       details: `Transaction ${data.type} créée: ${data.category} - ${data.amount} ${targetCurrency} (Réf: ${refNum})`,
     })
 
-    await notifyChurchUsers({
+    // Notifications en arrière-plan : ne doivent JAMAIS bloquer la création de transaction
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin', 'treasurer'],
       title: data.type === 'revenue' ? 'Nouvelle entrée financière' : 'Nouvelle dépense',
       message: `${data.category}: ${data.amount} ${targetCurrency} (Réf ${refNum}).`,
       type: data.type === 'revenue' ? 'success' : 'warning',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Finances POST] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Transaction enregistrée',
       message: `La transaction ${data.category} (${data.amount} ${targetCurrency}) a été enregistrée.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Finances POST] notifyUser failed:', err))
 
     return Response.json({ transaction }, { status: 201 })
   } catch (error) {
@@ -281,7 +284,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Validation failed', details: error.issues }, { status: 400 })
     }
     console.error('Finances POST error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -338,22 +341,24 @@ export async function PUT(request: NextRequest) {
       details: `Transaction modifiée (ID: ${id})`,
     })
 
-    await notifyChurchUsers({
+    // Notifications en arrière-plan
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin', 'treasurer'],
       title: 'Transaction mise à jour',
       message: `La transaction ${transaction.referenceNumber || id} a été modifiée.`,
       type: 'warning',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Finances PUT] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Modification enregistrée',
       message: `La transaction ${transaction.referenceNumber || id} a été mise à jour.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Finances PUT] notifyUser failed:', err))
 
     return Response.json({ transaction })
   } catch (error) {
@@ -361,7 +366,7 @@ export async function PUT(request: NextRequest) {
       return Response.json({ error: 'Validation failed', details: error.issues }, { status: 400 })
     }
     console.error('Finances PUT error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -369,7 +374,7 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const auth = await getAuth(request)
-    if (!auth) {
+    if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -401,26 +406,27 @@ export async function DELETE(request: NextRequest) {
       details: `Transaction supprimée (ID: ${id})`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin', 'treasurer'],
       title: 'Transaction supprimée',
       message: `Une transaction (${existing.referenceNumber || id}) a été supprimée.`,
       type: 'error',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Finances DELETE] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Suppression effectuée',
       message: `La transaction ${existing.referenceNumber || id} a été supprimée.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Finances DELETE] notifyUser failed:', err))
 
     return Response.json({ success: true })
   } catch (error) {
     console.error('Finances DELETE error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }

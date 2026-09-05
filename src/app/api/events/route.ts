@@ -123,22 +123,24 @@ export async function POST(request: NextRequest) {
       details: `Événement créé: ${data.title} (${data.type})`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       excludeUserIds: [auth.userId],
       title: 'Nouvel événement',
       message: `${data.title} est programmé le ${new Date(data.startDate).toLocaleString('fr-FR')}.`,
       type: 'info',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Events POST] notifyChurchUsers failed:', err))
+    
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Événement enregistré',
       message: `L’événement "${data.title}" a été créé avec succès.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Events POST] notifyUser failed:', err))
+    
     await dispatchEventRemindersForChurch({
       churchId: auth.churchId,
       eventIds: [event.id],
@@ -150,7 +152,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Validation failed', details: error.issues }, { status: 400 })
     }
     console.error('Events POST error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -199,26 +201,28 @@ export async function PUT(request: NextRequest) {
       details: `Événement modifié (ID: ${id})`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       excludeUserIds: [auth.userId],
       title: 'Événement mis à jour',
       message: `L’événement "${event.title}" a été modifié.`,
       type: 'warning',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Events PUT] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Modification enregistrée',
       message: `Les changements sur "${event.title}" ont été enregistrés.`,
       type: 'success',
       push: false,
-    })
-    await dispatchEventRemindersForChurch({
+    }).catch((err) => console.warn('[Events PUT] notifyUser failed:', err))
+
+    dispatchEventRemindersForChurch({
       churchId: auth.churchId,
       eventIds: [event.id],
-    })
+    }).catch((err) => console.warn('[Events PUT] dispatchEventReminders failed:', err))
 
     return Response.json({ event })
   } catch (error) {
@@ -226,7 +230,7 @@ export async function PUT(request: NextRequest) {
       return Response.json({ error: 'Validation failed', details: error.issues }, { status: 400 })
     }
     console.error('Events PUT error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -261,26 +265,27 @@ export async function DELETE(request: NextRequest) {
       details: `Événement supprimé (ID: ${id})`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       excludeUserIds: [auth.userId],
       title: 'Événement supprimé',
       message: `L’événement "${existing.title}" a été supprimé.`,
       type: 'error',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Events DELETE] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Suppression effectuée',
       message: `L’événement "${existing.title}" a bien été supprimé.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Events DELETE] notifyUser failed:', err))
 
     return Response.json({ success: true })
   } catch (error) {
     console.error('Events DELETE error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }

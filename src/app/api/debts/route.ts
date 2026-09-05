@@ -72,31 +72,31 @@ export async function POST(req: NextRequest) {
         message: `Dette de ${data.amount} ${data.currency} en attente d'approbation.`,
         type: 'warning',
         push: true,
-      })
+      }).catch((err) => console.warn('[Debts POST] notifyUsers failed:', err))
     } else {
-      await notifyChurchUsers({
+      notifyChurchUsers({
         churchId: auth.churchId,
         roles: ['admin', 'treasurer'],
         title: 'Dette approuvée automatiquement',
         message: `Dette ${data.amount} ${data.currency} (${data.creditor}) approuvée automatiquement.`,
         type: 'success',
         push: true,
-      })
+      }).catch((err) => console.warn('[Debts POST] notifyChurchUsers failed:', err))
     }
-    await notifyUser({
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Dette enregistrée',
       message: `La dette de ${data.amount} ${data.currency} a été enregistrée (${status}).`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Debts POST] notifyUser failed:', err))
     createAuditLog({ churchId: auth.churchId, userId: auth.userId, action: 'debt_created', details: `${data.amount} ${data.currency} — ${data.creditor} — ${status}` })
     return Response.json({ debt, autoApproved }, { status: 201 })
   } catch (e) {
     if (e instanceof z.ZodError) return Response.json({ error: 'Validation', details: e.issues }, { status: 400 })
     console.error('Debts POST:', e)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: e instanceof Error ? e.message : 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -112,22 +112,22 @@ export async function PATCH(req: NextRequest) {
     if (existing.status !== 'pending') return Response.json({ error: 'Not pending' }, { status: 409 })
     const debt = await db.debt.update({ where: { id: data.debtId }, data: { status: data.action, approvedBy: auth.userId, approvalComment: data.comment ?? null } })
     const label = data.action === 'approved' ? 'approuvée ✅' : 'rejetée ❌'
-    await notifyUser({
+    notifyUser({
       churchId: auth.churchId,
       userId: existing.createdBy,
       title: `Dette ${label}`,
       message: `${existing.amount} ${existing.currency} — ${label}${data.comment ? `. ${data.comment}` : ''}`,
       type: data.action === 'approved' ? 'success' : 'error',
       push: true,
-    })
-    await notifyChurchUsers({
+    }).catch((err) => console.warn('[Debts PATCH] notifyUser failed:', err))
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin', 'treasurer'],
       title: `Dette ${label}`,
       message: `Une dette de ${existing.amount} ${existing.currency} a été ${data.action === 'approved' ? 'approuvée' : 'rejetée'}.`,
       type: data.action === 'approved' ? 'success' : 'error',
       push: true,
-    })
+    }).catch((err) => console.warn('[Debts PATCH] notifyChurchUsers failed:', err))
     createAuditLog({ churchId: auth.churchId, userId: auth.userId, action: `debt_${data.action}`, details: `ID: ${data.debtId}${data.comment ? ' — ' + data.comment : ''}` })
     return Response.json({ debt })
   } catch (e) {

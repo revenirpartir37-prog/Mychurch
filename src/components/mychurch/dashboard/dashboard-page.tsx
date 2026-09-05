@@ -12,6 +12,8 @@ import { toast } from 'sonner'
 import {
   Users,
   DollarSign,
+  Banknote,
+  Euro,
   Calendar,
   ClipboardCheck,
   ArrowRight,
@@ -282,6 +284,12 @@ export function DashboardPage() {
     }
   }
 
+  const DashboardFinanceIcon = (stats.currencySymbol === 'FC' || auth.currencySymbol === 'FC' || auth.churchCurrency === 'CDF')
+    ? Banknote
+    : (stats.currencySymbol === '€' || auth.currencySymbol === '€' || auth.churchCurrency === 'EUR')
+    ? Euro
+    : DollarSign
+
   const statCards = [
     {
       title: 'Total Membres',
@@ -298,7 +306,7 @@ export function DashboardPage() {
       title: 'Solde Caisse',
       value: `${stats.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${stats.currencySymbol}`,
       subtitle: stats.initialCapital > 0 ? `Dont ${stats.initialCapital.toLocaleString('fr-FR')} ${stats.currencySymbol} capital initial` : undefined,
-      icon: DollarSign,
+      icon: DashboardFinanceIcon,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',
       gradient: 'from-emerald-500/5 via-emerald-400/3 to-transparent',
@@ -331,7 +339,7 @@ export function DashboardPage() {
 
   const quickActions = [
     ...(canCreateMembers(auth.role) ? [{ label: 'Ajouter Membre', description: 'Enregistrer un nouveau membre dans l\'église', icon: Users, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', gradient: 'from-emerald-500/5 to-emerald-500/0', view: 'members' as const }] : []),
-    ...(canCreateFinances(auth.role) ? [{ label: 'Nouvelle Offrande', description: 'Enregistrer une offrande ou un don', icon: DollarSign, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', gradient: 'from-amber-500/5 to-amber-500/0', view: 'finances' as const }] : []),
+    ...(canCreateFinances(auth.role) ? [{ label: 'Nouvelle Offrande', description: 'Enregistrer une offrande ou un don', icon: DashboardFinanceIcon, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', gradient: 'from-amber-500/5 to-amber-500/0', view: 'finances' as const }] : []),
     ...(canCreateEvents(auth.role) ? [{ label: 'Planifier Événement', description: 'Créer un nouvel événement pour l\'église', icon: Calendar, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-500/10', gradient: 'from-orange-500/5 to-orange-500/0', view: 'events' as const }] : []),
     { label: 'Générer Carte', description: 'Générer une carte de membre', icon: CreditCard, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', gradient: 'from-rose-500/5 to-rose-500/0', view: 'member-cards' as const },
     ...(canSendMessages(auth.role) ? [{ label: 'Envoyer Message', description: 'Envoyer un message aux membres', icon: Send, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10', gradient: 'from-rose-500/5 to-rose-500/0', view: 'messages' as const, hasPulse: true }] : []),
@@ -879,7 +887,7 @@ export function DashboardPage() {
               </div>
             ) : recentTransactions.length === 0 ? (
               <EmptyState
-                icon={DollarSign}
+                icon={DashboardFinanceIcon}
                 title="Aucune transaction enregistrée"
                 description="Les transactions récentes apparaîtront ici"
               />

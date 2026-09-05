@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, TrendingUp, TrendingDown, DollarSign, Wallet, Building2, Banknote, Edit, Trash2, ArrowUpRight, ArrowDownRight, Wallet as WalletIcon, PieChart as PieChartIcon, BarChart3, Download, FileText, Printer } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, DollarSign, Euro, Coins, Wallet, Building2, Banknote, Edit, Trash2, ArrowUpRight, ArrowDownRight, Wallet as WalletIcon, PieChart as PieChartIcon, BarChart3, Download, FileText, Printer } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -210,8 +210,11 @@ export function FinancesPage() {
   const openCreate = (type: 'revenue' | 'expense') => {
     setEditing(null)
     const userFullName = [auth.firstName, auth.lastName].filter(Boolean).join(' ')
+    const activeSelectedCurr = currencyFilter !== 'all'
+      ? (currencyFilter === 'CDF' ? 'FC' : currencyFilter) as Currency
+      : defaultFormCurrency
     setForm({
-      type, category: '', amount: '', currency: defaultFormCurrency,
+      type, category: '', amount: '', currency: activeSelectedCurr,
       location: 'cash', description: '', date: new Date().toISOString().split('T')[0], memberId: '',
       recordedByName: userFullName,
       beneficiary: '',
@@ -399,88 +402,182 @@ export function FinancesPage() {
     }
   }
 
+  const CurrentFinanceIcon = (activeChartSymbol === 'FC' || canonChurchCurrency === 'CDF')
+    ? Banknote
+    : (activeChartSymbol === '€' || canonChurchCurrency === 'EUR')
+    ? Euro
+    : DollarSign
+
+  const caisseConfigs = [
+    { currency: 'CDF', symbol: 'FC', name: 'Francs Congolais (FC)', color: 'amber', icon: '🇨🇩' },
+    { currency: 'USD', symbol: '$', name: 'Dollars Américains ($)', color: 'emerald', icon: '🇺🇸' },
+    { currency: 'EUR', symbol: '€', name: 'Euros (€)', color: 'blue', icon: '🇪🇺' },
+  ].sort((a, b) => {
+    if (a.currency === canonChurchCurrency) return -1
+    if (b.currency === canonChurchCurrency) return 1
+    return 0
+  })
+
   return (
     <div className="space-y-6">
       {/* Gradient Header Bar */}
-      <div className="flex items-center justify-between rounded-xl bg-gradient-to-r from-primary to-primary/60 p-5 text-primary-foreground shadow-md">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl bg-gradient-to-r from-primary to-primary/60 p-5 text-primary-foreground shadow-md">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-            <DollarSign className="h-5 w-5" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 shadow-inner">
+            <CurrentFinanceIcon className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold">Gestion Financière</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl md:text-2xl font-bold">Gestion Financière</h1>
+              <Badge className="bg-white/20 text-white hover:bg-white/30 text-[11px] border-white/30 font-semibold">
+                {activeChartCurrency} ({activeChartSymbol})
+              </Badge>
+            </div>
             <p className="text-xs text-primary-foreground/80">{CREATOR}</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExportCSV} disabled={exporting} className="gap-2 border-white/40 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
-            <Download className="h-4 w-4" /> {exporting ? 'Export...' : 'Exporter CSV'}
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={handleExportCSV} disabled={exporting} className="gap-2 border-white/40 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground text-xs">
+            <Download className="h-3.5 w-3.5" /> {exporting ? 'Export...' : 'Exporter CSV'}
           </Button>
-          <Button onClick={() => openCreate('revenue')} className="gap-2 bg-white text-primary hover:bg-white/90">
-            <ArrowUpRight className="h-4 w-4" /> Compte rendu
+          <Button onClick={() => openCreate('revenue')} className="gap-2 bg-white text-primary hover:bg-white/90 font-bold text-xs">
+            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" /> Compte rendu
           </Button>
-          <Button variant="outline" onClick={() => openCreate('expense')} className="gap-2 border-white/40 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
-            <ArrowDownRight className="h-4 w-4" /> Dépense
+          <Button variant="outline" onClick={() => openCreate('expense')} className="gap-2 border-white/40 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground font-bold text-xs">
+            <ArrowDownRight className="h-3.5 w-3.5 text-rose-300" /> Dépense
           </Button>
         </div>
       </div>
 
-      {/* Multi-Currency Caisse Physique Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { currency: 'USD', symbol: '$', color: 'emerald', icon: '🇺🇸' },
-          { currency: 'EUR', symbol: '€', color: 'blue', icon: '🇪🇺' },
-          { currency: 'CDF', symbol: 'FC', color: 'amber', icon: '🇨🇩' },
-        ].map(({ currency, symbol, color, icon }) => {
-          const c = currencies[currency] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
-          const isNegative = c.balance < 0
-          return (
-            <Card key={currency} className={`border-l-4 hover:shadow-lg transition-all duration-200 overflow-hidden relative ${
-              color === 'emerald' ? 'border-l-emerald-500' : color === 'blue' ? 'border-l-blue-500' : 'border-l-amber-500'
-            }`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className={`p-2 rounded-lg ${
-                      color === 'emerald' ? 'bg-emerald-500/10' : color === 'blue' ? 'bg-blue-500/10' : 'bg-amber-500/10'
-                    }`}>
-                      <Banknote className={`h-5 w-5 ${
-                        color === 'emerald' ? 'text-emerald-500' : color === 'blue' ? 'text-blue-500' : 'text-amber-500'
-                      }`} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Caisse {currency}</p>
-                      <p className={`text-xl font-bold tabular-nums ${
-                        isNegative ? 'text-rose-500' : color === 'emerald' ? 'text-emerald-600' : color === 'blue' ? 'text-blue-600' : 'text-amber-600'
+      {/* Multi-Currency Caisse Physique Cards — Claires, Distinctes et Cliquables */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary" /> Soldes des Caisses Physiques
+          </h2>
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            Cliquez sur une caisse pour filtrer l&apos;ensemble des opérations
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {caisseConfigs.map(({ currency, symbol, name, color, icon }) => {
+            const c = currencies[currency] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
+            const isNegative = c.balance < 0
+            const isSelected = currencyFilter === currency
+            const isPrimary = currency === canonChurchCurrency
+
+            const CaisseIcon = currency === 'CDF' ? Banknote : currency === 'EUR' ? Euro : DollarSign
+
+            return (
+              <Card
+                key={currency}
+                onClick={() => setCurrencyFilter(isSelected ? 'all' : currency)}
+                className={`border-l-4 transition-all duration-200 cursor-pointer relative overflow-hidden ${
+                  color === 'emerald' ? 'border-l-emerald-500' : color === 'blue' ? 'border-l-blue-500' : 'border-l-amber-500'
+                } ${
+                  isSelected
+                    ? 'ring-2 ring-primary ring-offset-2 shadow-lg bg-primary/5 dark:bg-primary/10'
+                    : 'hover:shadow-md hover:border-primary/40'
+                }`}
+              >
+                {isPrimary && (
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0 bg-primary/15 text-primary border-primary/20">
+                      ★ Devise Église
+                    </Badge>
+                  </div>
+                )}
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-2.5 rounded-xl ${
+                        color === 'emerald' ? 'bg-emerald-500/10 text-emerald-600' : color === 'blue' ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'
                       }`}>
-                        {c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {symbol}
-                      </p>
+                        <CaisseIcon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">{icon}</span>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">{name}</p>
+                        </div>
+                        <p className={`text-2xl font-black tabular-nums mt-0.5 ${
+                          isNegative ? 'text-rose-500' : color === 'emerald' ? 'text-emerald-600' : color === 'blue' ? 'text-blue-600' : 'text-amber-600'
+                        }`}>
+                          {c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {symbol}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <span className="text-lg">{icon}</span>
-                </div>
-                <div className="space-y-1.5 text-xs text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Capital initial</span>
-                    <span className="font-medium text-foreground tabular-nums">{c.initialCapital.toLocaleString('fr-FR')} {symbol}</span>
+
+                  <div className="space-y-1.5 text-xs text-muted-foreground bg-muted/40 p-2.5 rounded-lg">
+                    <div className="flex justify-between">
+                      <span>Capital initial</span>
+                      <span className="font-medium text-foreground tabular-nums">{c.initialCapital.toLocaleString('fr-FR')} {symbol}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-emerald-600 dark:text-emerald-400">+ Entrées / Compte rendus</span>
+                      <span className="font-medium text-emerald-600 dark:text-emerald-400 tabular-nums">+{c.revenue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-rose-600 dark:text-rose-400">− Sorties / Dépenses</span>
+                      <span className="font-medium text-rose-600 dark:text-rose-400 tabular-nums">−{c.expense.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+                    </div>
+                    <div className={`flex justify-between pt-1.5 mt-1 border-t font-bold ${isNegative ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}`}>
+                      <span>Solde disponible</span>
+                      <span className="tabular-nums">{c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-600">+ Recettes</span>
-                    <span className="font-medium text-emerald-600 tabular-nums">+{c.revenue.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
+
+                  <div className="mt-2 text-center">
+                    <span className={`text-[10px] font-semibold ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {isSelected ? '✓ Caisse activement sélectionnée (cliquer pour réinitialiser)' : 'Cliquer pour filtrer uniquement cette caisse →'}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-rose-500">− Dépenses</span>
-                    <span className="font-medium text-rose-500 tabular-nums">−{c.expense.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
-                  </div>
-                  <div className={`flex justify-between pt-1.5 mt-1 border-t font-semibold ${isNegative ? 'text-rose-500' : 'text-foreground'}`}>
-                    <span>Solde disponible</span>
-                    <span className="tabular-nums">{c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {symbol}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+
+        {/* Barre de sélection rapide de la Caisse */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-card rounded-xl border">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground mr-1">Vue :</span>
+            <Button
+              size="sm"
+              variant={currencyFilter === 'all' ? 'default' : 'outline'}
+              onClick={() => setCurrencyFilter('all')}
+              className="h-7 text-xs font-semibold"
+            >
+              Toutes devises réunies
+            </Button>
+            {caisseConfigs.map((c) => (
+              <Button
+                key={c.currency}
+                size="sm"
+                variant={currencyFilter === c.currency ? 'default' : 'outline'}
+                onClick={() => setCurrencyFilter(c.currency)}
+                className="h-7 text-xs font-semibold gap-1"
+              >
+                <span>{c.icon}</span>
+                <span>{c.currency === 'CDF' ? 'Caisse Francs (FC)' : c.currency === 'USD' ? 'Caisse Dollars ($)' : 'Caisse Euros (€)'}</span>
+                {c.currency === canonChurchCurrency && <span className="text-[10px] text-amber-500 font-bold">★</span>}
+              </Button>
+            ))}
+          </div>
+
+          {currencyFilter !== 'all' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrencyFilter('all')}
+              className="text-xs text-muted-foreground hover:text-foreground h-7"
+            >
+              Réinitialiser
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Analyse financière — Charts Section (top) */}
@@ -663,7 +760,7 @@ export function FinancesPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-violet-500/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-violet-500" />
+                <CurrentFinanceIcon className="h-5 w-5 text-violet-500" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Solde</p>
@@ -914,7 +1011,7 @@ export function FinancesPage() {
                   <TableRow>
                     <TableCell colSpan={7} className="p-0">
                       <EmptyState
-                        icon={DollarSign}
+                        icon={CurrentFinanceIcon}
                         title="Aucune transaction trouvée"
                         description="Commencez par ajouter un compte rendu ou une dépense"
                         action={canCreateFinances(auth.role) ? { label: 'Ajouter une transaction', onClick: () => openCreate('revenue') } : undefined}
@@ -936,8 +1033,25 @@ export function FinancesPage() {
                       <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                         {t.description || '—'}
                       </TableCell>
-                      <TableCell className={`font-semibold ${t.type === 'revenue' ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {t.type === 'revenue' ? '+' : '-'}{t.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol(t.currency)}
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 font-semibold tabular-nums">
+                          <span className={t.type === 'revenue' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                            {t.type === 'revenue' ? '+' : '−'}{t.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          {normalizeCurrencyCode(t.currency) === 'CDF' ? (
+                            <Badge variant="outline" className="border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 font-bold text-[10px] px-1.5 py-0">
+                              FC
+                            </Badge>
+                          ) : normalizeCurrencyCode(t.currency) === 'EUR' ? (
+                            <Badge variant="outline" className="border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/10 font-bold text-[10px] px-1.5 py-0">
+                              €
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-bold text-[10px] px-1.5 py-0">
+                              $
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <Badge variant="outline" className="gap-1">

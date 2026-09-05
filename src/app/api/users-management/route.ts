@@ -150,22 +150,23 @@ export async function POST(req: NextRequest) {
       details: `${data.firstName} ${data.lastName} — ${data.email} — ${data.role}`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin'],
       title: 'Utilisateur créé',
       message: `${data.firstName} ${data.lastName} (${data.role}) a été ajouté.`,
       type: 'info',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Users POST] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: user.id,
       title: 'Compte activé',
       message: 'Votre compte MYCHURCH a été créé. Connectez-vous pour commencer.',
       type: 'success',
       push: true,
-    })
+    }).catch((err) => console.warn('[Users POST] notifyUser failed:', err))
 
     return Response.json({ user }, { status: 201 })
   } catch (e) {
@@ -235,22 +236,23 @@ export async function PATCH(req: NextRequest) {
       details: `ID: ${data.id}`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin'],
       title: 'Utilisateur mis à jour',
       message: `${user.firstName} ${user.lastName} a été modifié.`,
       type: 'warning',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Users PATCH] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: user.id,
       title: 'Profil mis à jour',
       message: 'Vos informations de compte ont été mises à jour.',
       type: 'info',
       push: true,
-    })
+    }).catch((err) => console.warn('[Users PATCH] notifyUser failed:', err))
 
     return Response.json({ user })
   } catch (e) {
@@ -287,22 +289,23 @@ export async function DELETE(req: NextRequest) {
       details: `${existing.firstName} ${existing.lastName} — ${existing.email}`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       roles: ['admin'],
       title: 'Utilisateur désactivé',
       message: `${existing.firstName} ${existing.lastName} a été désactivé.`,
       type: 'error',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Users DELETE] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: existing.id,
       title: 'Compte désactivé',
       message: 'Votre accès à MYCHURCH a été désactivé par un administrateur.',
       type: 'error',
       push: true,
-    })
+    }).catch((err) => console.warn('[Users DELETE] notifyUser failed:', err))
 
     return Response.json({ success: true })
   } catch (e) {

@@ -149,22 +149,23 @@ export async function POST(request: NextRequest) {
       details: `Membre créé: ${data.firstName} ${data.lastName}`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       excludeUserIds: [auth.userId],
       title: 'Nouveau membre enregistré',
       message: `${data.firstName} ${data.lastName} a été ajouté.`,
       type: 'info',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Members POST] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Membre créé',
       message: `${data.firstName} ${data.lastName} a été enregistré avec succès.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Members POST] notifyUser failed:', err))
 
     return Response.json({ member }, { status: 201 })
   } catch (error) {
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Validation failed', details: error.issues }, { status: 400 })
     }
     console.error('Members POST error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    return Response.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -229,22 +230,23 @@ export async function PUT(request: NextRequest) {
       details: `Membre modifié: ${existing.firstName} ${existing.lastName} (ID: ${id})`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       excludeUserIds: [auth.userId],
       title: 'Membre mis à jour',
       message: `${existing.firstName} ${existing.lastName} a été modifié.`,
       type: 'warning',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Members PUT] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Modification enregistrée',
       message: `Le profil de ${existing.firstName} ${existing.lastName} a été mis à jour.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Members PUT] notifyUser failed:', err))
 
     return Response.json({ member })
   } catch (error) {
@@ -286,22 +288,23 @@ export async function DELETE(request: NextRequest) {
         details: `Suppression en masse: ${result.count} membre(s) désactivé(s)`,
       })
 
-      await notifyChurchUsers({
+      notifyChurchUsers({
         churchId: auth.churchId,
         excludeUserIds: [auth.userId],
         title: 'Membres désactivés',
         message: `${result.count} membre(s) ont été désactivé(s).`,
         type: 'error',
         push: true,
-      })
-      await notifyUser({
+      }).catch((err) => console.warn('[Members DELETE bulk] notifyChurchUsers failed:', err))
+
+      notifyUser({
         churchId: auth.churchId,
         userId: auth.userId,
         title: 'Suppression en masse effectuée',
         message: `${result.count} membre(s) ont été désactivé(s).`,
         type: 'success',
         push: false,
-      })
+      }).catch((err) => console.warn('[Members DELETE bulk] notifyUser failed:', err))
 
       return Response.json({ deleted: result.count })
     }
@@ -334,22 +337,23 @@ export async function DELETE(request: NextRequest) {
       details: `Membre désactivé: ${existing.firstName} ${existing.lastName} (ID: ${id})`,
     })
 
-    await notifyChurchUsers({
+    notifyChurchUsers({
       churchId: auth.churchId,
       excludeUserIds: [auth.userId],
       title: 'Membre désactivé',
       message: `${existing.firstName} ${existing.lastName} a été désactivé.`,
       type: 'error',
       push: true,
-    })
-    await notifyUser({
+    }).catch((err) => console.warn('[Members DELETE] notifyChurchUsers failed:', err))
+
+    notifyUser({
       churchId: auth.churchId,
       userId: auth.userId,
       title: 'Suppression effectuée',
       message: `${existing.firstName} ${existing.lastName} a été désactivé.`,
       type: 'success',
       push: false,
-    })
+    }).catch((err) => console.warn('[Members DELETE] notifyUser failed:', err))
 
     return Response.json({ member })
   } catch (error) {
