@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { authFetch } from '@/lib/auth-fetch'
-import { CREATOR, ROLE_LABELS, CURRENCY_LABELS, type Currency } from '@/lib/constants'
+import { CREATOR, ROLE_LABELS, CURRENCY_LABELS, APP_VERSION, type Currency } from '@/lib/constants'
 import { uploadImage } from '@/lib/upload-image'
 import { useTheme } from 'next-themes'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -41,6 +41,7 @@ import {
   CheckCircle2,
   Sparkles,
   KeyRound,
+  RefreshCw,
 } from 'lucide-react'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -987,13 +988,53 @@ export function SettingsPage() {
                 className="gap-2"
               >
                 {pushLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                {pushSubscribed ? 'Déjà activé' : 'Activer les notifications'}
+                {pushSubscribed ? 'Déjà activé ✓' : 'Activer les notifications'}
               </Button>
               {pushPermission === 'denied' && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   Les notifications sont bloquées par le navigateur. Autorisez-les dans les paramètres du site.
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* App Version & Update */}
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-950/50">
+                <RefreshCw className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Mise à jour de l&apos;application</CardTitle>
+                <CardDescription>Version installée : v{APP_VERSION}</CardDescription>
+              </div>
+            </CardHeader>
+            <Separator />
+            <CardContent className="pt-4 space-y-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Cliquez sur le bouton ci-dessous pour vérifier si une nouvelle version de MYCHURCH est disponible et l&apos;installer immédiatement.
+              </p>
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready
+                      .then((reg) => reg.update())
+                      .then(() => {
+                        toast.success(`Application à jour — v${APP_VERSION}`)
+                      })
+                      .catch(() => {
+                        toast.info('Aucune mise à jour disponible pour l\'instant')
+                      })
+                  } else {
+                    window.location.reload()
+                  }
+                }}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Vérifier les mises à jour
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1469,7 +1510,7 @@ export function SettingsPage() {
                   className="h-20 w-20 object-contain"
                 />
               </div>
-              <CardTitle className="text-xl">MYCHURCH v1.0.0</CardTitle>
+              <CardTitle className="text-xl">MYCHURCH v{APP_VERSION}</CardTitle>
               <CardDescription>Plateforme de gestion d&apos;église</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

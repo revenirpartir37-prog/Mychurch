@@ -60,7 +60,7 @@ export function FinancesPage() {
     { USD: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }, EUR: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }, CDF: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 } }
   )
   const [nextRefNumber, setNextRefNumber] = useState('REF-000001')
-  const [churchCurrency, setChurchCurrency] = useState('USD')
+  const [churchCurrency, setChurchCurrency] = useState(normalizeCurrencyCode(auth.churchCurrency) || 'USD')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [members, setMembers] = useState<{ id: string; firstName: string; lastName: string }[]>([])
@@ -70,11 +70,14 @@ export function FinancesPage() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
   const [exporting, setExporting] = useState(false)
 
+  const canonChurchCurrency = normalizeCurrencyCode(auth.churchCurrency || churchCurrency || 'USD')
+  const defaultFormCurrency = (canonChurchCurrency === 'CDF' ? 'FC' : canonChurchCurrency) as Currency
+
   const [form, setForm] = useState({
     type: 'revenue' as 'revenue' | 'expense',
     category: '' as string,
     amount: '',
-    currency: 'USD' as Currency,
+    currency: defaultFormCurrency,
     location: 'cash' as TransactionLocation,
     description: '',
     date: new Date().toISOString().split('T')[0],
@@ -181,7 +184,7 @@ export function FinancesPage() {
         setDialogOpen(false)
         setEditing(null)
         setForm({
-          type: 'revenue', category: '', amount: '', currency: 'USD',
+          type: 'revenue', category: '', amount: '', currency: defaultFormCurrency,
           location: 'cash', description: '', date: new Date().toISOString().split('T')[0], memberId: '',
           recordedByName: '', beneficiary: '', referenceNumber: '', signatureData: null,
         })
@@ -208,7 +211,7 @@ export function FinancesPage() {
     setEditing(null)
     const userFullName = [auth.firstName, auth.lastName].filter(Boolean).join(' ')
     setForm({
-      type, category: '', amount: '', currency: 'USD',
+      type, category: '', amount: '', currency: defaultFormCurrency,
       location: 'cash', description: '', date: new Date().toISOString().split('T')[0], memberId: '',
       recordedByName: userFullName,
       beneficiary: '',
@@ -220,11 +223,13 @@ export function FinancesPage() {
 
   const openEdit = (t: Transaction) => {
     setEditing(t)
+    const rawCurr = t.currency || 'USD'
+    const editCurr = (normalizeCurrencyCode(rawCurr) === 'CDF' ? 'FC' : rawCurr) as Currency
     setForm({
       type: t.type as 'revenue' | 'expense',
       category: t.category,
       amount: String(t.amount),
-      currency: t.currency as Currency,
+      currency: editCurr,
       location: t.location as TransactionLocation,
       description: t.description || '',
       date: t.date.split('T')[0],
@@ -237,6 +242,17 @@ export function FinancesPage() {
     setDialogOpen(true)
   }
 
+  // Active currency and symbol for charts and totals
+  const activeChartCurrency = currencyFilter !== 'all'
+    ? normalizeCurrencyCode(currencyFilter)
+    : canonChurchCurrency
+  const activeChartSymbol = currencySymbol(activeChartCurrency)
+
+  // Transactions filtrées par devise pour que les graphiques ne mélangent jamais les Francs et les Dollars
+  const chartTransactions = allTransactions.filter(
+    (t) => normalizeCurrencyCode(t.currency) === activeChartCurrency
+  )
+
   // Monthly trend data (last 6 months)
   const monthlyTrendData = (() => {
     const now = new Date()
@@ -247,7 +263,7 @@ export function FinancesPage() {
       const label = d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
       months.push({ key, label, "Compte rendus": 0, Dépenses: 0 })
     }
-    allTransactions.forEach((t) => {
+    chartTransactions.forEach((t) => {
       const tDate = new Date(t.date)
       const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`
       const month = months.find((m) => m.key === tKey)
@@ -269,7 +285,7 @@ export function FinancesPage() {
   ]
 
   const expenseCategoryData = (() => {
-    const expenseTxs = allTransactions.filter((t) => t.type === 'expense')
+    const expenseTxs = chartTransactions.filter((t) => t.type === 'expense')
     const categoryMap: Record<string, number> = {}
     expenseTxs.forEach((t) => {
       categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount
@@ -295,7 +311,7 @@ export function FinancesPage() {
   ]
 
   const revenueCategoryData = (() => {
-    const revenueTxs = allTransactions.filter((t) => t.type === 'revenue')
+    const revenueTxs = chartTransactions.filter((t) => t.type === 'revenue')
     const categoryMap: Record<string, number> = {}
     revenueTxs.forEach((t) => {
       categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount
@@ -313,17 +329,17 @@ export function FinancesPage() {
 
   // Sparkline data (last 7 transactions grouped by day)
   const sparklineRevenue = (() => {
-    const rev = allTransactions.filter((t) => t.type === 'revenue').slice(-7)
-    return rev.map((t, i) => ({ v: t.amount }))
+    const rev = chartTransactions.filter((t) => t.type === 'revenue').slice(-7)
+    return rev.map((t) => ({ v: t.amount }))
   })()
 
   const sparklineExpense = (() => {
-    const exp = allTransactions.filter((t) => t.type === 'expense').slice(-7)
-    return exp.map((t, i) => ({ v: t.amount }))
+    const exp = chartTransactions.filter((t) => t.type === 'expense').slice(-7)
+    return exp.map((t) => ({ v: t.amount }))
   })()
 
   const sparklineBalance = (() => {
-    const recent = allTransactions.slice(-7)
+    const recent = chartTransactions.slice(-7)
     let running = 0
     return recent.map((t) => {
       running += t.type === 'revenue' ? t.amount : -t.amount
@@ -471,9 +487,14 @@ export function FinancesPage() {
       {!chartDataLoading && allTransactions.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-teal-500" />
-              Analyse financière
+            <CardTitle className="text-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-teal-500" />
+                <span>Analyse financière</span>
+              </div>
+              <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5 border-teal-500/40 text-teal-600 dark:text-teal-400">
+                {activeChartCurrency} ({activeChartSymbol})
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -499,7 +520,7 @@ export function FinancesPage() {
                             borderRadius: '8px',
                             fontSize: '13px',
                           }}
-                          formatter={(value: number) => [`${value.toFixed(2)} USD`, '']}
+                          formatter={(value: number) => [`${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${activeChartSymbol}`, '']}
                         />
                         <Legend />
                         <Bar dataKey="Compte rendus" fill="var(--color-emerald-500)" radius={[4, 4, 0, 0]} />
@@ -544,7 +565,7 @@ export function FinancesPage() {
                                 borderRadius: '8px',
                                 fontSize: '13px',
                               }}
-                              formatter={(value: number) => [`${value.toFixed(2)} USD`, '']}
+                              formatter={(value: number) => [`${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${activeChartSymbol}`, '']}
                             />
                             <Legend />
                           </PieChart>
@@ -561,7 +582,7 @@ export function FinancesPage() {
                               <span className="text-sm truncate">{entry.name}</span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-sm font-medium tabular-nums">{entry.value.toFixed(0)} USD</span>
+                              <span className="text-sm font-medium tabular-nums">{entry.value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</span>
                               <span className="text-xs text-muted-foreground w-10 text-right">
                                 {totalRevenuePie > 0
                                   ? ((entry.value / totalRevenuePie) * 100).toFixed(0)
@@ -590,7 +611,7 @@ export function FinancesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Total Compte rendus</p>
-                <p className="text-xl font-bold text-emerald-500 tabular-nums">{totals.revenue.toFixed(2)} {currencySymbol(churchCurrency)}</p>
+                <p className="text-xl font-bold text-emerald-500 tabular-nums">{totals.revenue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</p>
               </div>
             </div>
             {sparklineRevenue.length > 1 && (
@@ -618,7 +639,7 @@ export function FinancesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Total Dépenses</p>
-                <p className="text-xl font-bold text-rose-500 tabular-nums">{totals.expense.toFixed(2)} {currencySymbol(churchCurrency)}</p>
+                <p className="text-xl font-bold text-rose-500 tabular-nums">{totals.expense.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</p>
               </div>
             </div>
             {sparklineExpense.length > 1 && (
@@ -646,7 +667,7 @@ export function FinancesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Solde</p>
-                <p className="text-xl font-bold text-violet-500 tabular-nums">{totals.balance.toFixed(2)} {currencySymbol(churchCurrency)}</p>
+                <p className="text-xl font-bold text-violet-500 tabular-nums">{totals.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</p>
               </div>
             </div>
             {sparklineBalance.length > 1 && (
@@ -692,7 +713,7 @@ export function FinancesPage() {
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      formatter={(value: number) => [`${value.toFixed(2)} USD`, '']}
+                      formatter={(value: number) => [`${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${activeChartSymbol}`, '']}
                     />
                     <Bar dataKey="value" radius={[6, 6, 0, 0]} />
                   </BarChart>
@@ -732,7 +753,7 @@ export function FinancesPage() {
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      formatter={(value: number) => [`${value.toFixed(2)} USD`, '']}
+                      formatter={(value: number) => [`${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${activeChartSymbol}`, '']}
                     />
                     <Legend />
                     <Line
@@ -799,14 +820,14 @@ export function FinancesPage() {
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      formatter={(value: number) => [`${value.toFixed(2)} USD`, '']}
+                      formatter={(value: number) => [`${value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${activeChartSymbol}`, '']}
                     />
                   </PieChart>
                 </ResponsiveContainer>
                 {/* Center text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-base font-bold">{totalExpensesPie.toFixed(0)} USD</p>
+                  <p className="text-base font-bold">{totalExpensesPie.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</p>
                 </div>
               </div>
               {/* Legend */}
@@ -821,7 +842,7 @@ export function FinancesPage() {
                       <span className="text-sm">{entry.name}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium tabular-nums">{entry.value.toFixed(2)} USD</span>
+                      <span className="text-sm font-medium tabular-nums">{entry.value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</span>
                       <span className="text-xs text-muted-foreground w-12 text-right">
                         {totalExpensesPie > 0
                           ? ((entry.value / totalExpensesPie) * 100).toFixed(0)
@@ -841,12 +862,12 @@ export function FinancesPage() {
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3">
             <Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-              <SelectTrigger className="w-32"><SelectValue placeholder="Devise" /></SelectTrigger>
+              <SelectTrigger className="w-36"><SelectValue placeholder="Devise" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes devises</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
-                <SelectItem value="FC">FC</SelectItem>
-                <SelectItem value="EUR">EUR</SelectItem>
+                <SelectItem value="CDF">Francs (FC)</SelectItem>
+                <SelectItem value="USD">Dollars ($)</SelectItem>
+                <SelectItem value="EUR">Euros (€)</SelectItem>
               </SelectContent>
             </Select>
             <Select value={locationFilter} onValueChange={setLocationFilter}>
@@ -916,7 +937,7 @@ export function FinancesPage() {
                         {t.description || '—'}
                       </TableCell>
                       <TableCell className={`font-semibold ${t.type === 'revenue' ? 'text-emerald-500' : 'text-red-500'}`}>
-                        {t.type === 'revenue' ? '+' : '-'}{t.amount.toFixed(2)} {currencySymbol(t.currency)}
+                        {t.type === 'revenue' ? '+' : '-'}{t.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol(t.currency)}
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
                         <Badge variant="outline" className="gap-1">

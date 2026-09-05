@@ -38,8 +38,13 @@ import { useSupabaseRealtime } from '@/hooks/use-supabase-realtime'
 
 interface DashboardStats {
   totalMembers: number
+  balance: number
+  initialCapital: number
   monthlyRevenue: number
+  totalRevenue: number
   totalExpense: number
+  currency: string
+  currencySymbol: string
   upcomingEvents: number
   monthlyAttendance: number
 }
@@ -79,10 +84,20 @@ export function DashboardPage() {
   const { auth, setCurrentView, unreadCount } = useAppStore()
   const [stats, setStats] = useState<DashboardStats>({
     totalMembers: 0,
+    balance: 0,
+    initialCapital: 0,
     monthlyRevenue: 0,
+    totalRevenue: 0,
     totalExpense: 0,
+    currency: 'USD',
+    currencySymbol: '$',
     upcomingEvents: 0,
     monthlyAttendance: 0,
+  })
+  const [currencies, setCurrencies] = useState<Record<string, { initialCapital: number; revenue: number; expense: number; balance: number }>>({
+    USD: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 },
+    EUR: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 },
+    CDF: { initialCapital: 0, revenue: 0, expense: 0, balance: 0 },
   })
   const [loading, setLoading] = useState(true)
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
@@ -188,13 +203,23 @@ export function DashboardPage() {
       const data = await res.json()
 
       const statsData = data.stats ?? {}
+      const fallbackCurr = auth.churchCurrency || 'USD'
+      const fallbackSym = auth.currencySymbol || (fallbackCurr === 'CDF' ? 'FC' : fallbackCurr === 'EUR' ? '€' : '$')
+
       setStats({
         totalMembers: statsData.totalMembers ?? 0,
+        balance: statsData.balance ?? 0,
+        initialCapital: statsData.initialCapital ?? 0,
         monthlyRevenue: statsData.monthlyRevenue ?? 0,
+        totalRevenue: statsData.totalRevenue ?? 0,
         totalExpense: statsData.totalExpense ?? 0,
+        currency: statsData.currency || fallbackCurr,
+        currencySymbol: statsData.currencySymbol || fallbackSym,
         upcomingEvents: statsData.upcomingEvents ?? 0,
         monthlyAttendance: statsData.monthlyAttendance ?? 0,
       })
+
+      if (data.currencies) setCurrencies(data.currencies)
 
       setRecentTransactions(data.recentTransactions ?? [])
       setRecentMembers(data.recentMembers ?? [])
@@ -261,6 +286,7 @@ export function DashboardPage() {
     {
       title: 'Total Membres',
       value: stats.totalMembers,
+      subtitle: undefined,
       icon: Users,
       color: 'text-teal-500',
       bg: 'bg-teal-500/10',
@@ -269,8 +295,9 @@ export function DashboardPage() {
       view: 'members' as const,
     },
     ...(canViewFinances(auth.role) ? [{
-      title: 'Compte rendus totaux',
-      value: `${stats.monthlyRevenue.toFixed(2)} $`,
+      title: 'Solde Caisse',
+      value: `${stats.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${stats.currencySymbol}`,
+      subtitle: stats.initialCapital > 0 ? `Dont ${stats.initialCapital.toLocaleString('fr-FR')} ${stats.currencySymbol} capital initial` : undefined,
       icon: DollarSign,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',
@@ -281,6 +308,7 @@ export function DashboardPage() {
     {
       title: 'Événements',
       value: stats.upcomingEvents,
+      subtitle: undefined,
       icon: Calendar,
       color: 'text-amber-500',
       bg: 'bg-amber-500/10',
@@ -291,6 +319,7 @@ export function DashboardPage() {
     {
       title: 'Présences',
       value: stats.monthlyAttendance,
+      subtitle: undefined,
       icon: ClipboardCheck,
       color: 'text-rose-500',
       bg: 'bg-rose-500/10',
@@ -442,7 +471,10 @@ export function DashboardPage() {
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-muted-foreground">{stat.title}</p>
-                      <p className="text-3xl font-bold mt-1">{stat.value}</p>
+                      <p className="text-2xl lg:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
+                      {stat.subtitle && (
+                        <p className="text-[11px] text-muted-foreground mt-1 font-medium truncate">{stat.subtitle}</p>
+                      )}
                     </div>
                     <div className={`p-4 rounded-xl ${stat.bg}`}>
                       <stat.icon className={`h-7 w-7 ${stat.color}`} />
@@ -462,6 +494,51 @@ export function DashboardPage() {
               </Card>
             ))}
       </div>
+
+      {/* Multi-Currency Caisses Overview */}
+      {canViewFinances(auth.role) && !loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { curr: 'CDF', sym: 'FC', name: 'Caisse Francs (FC)', icon: '🇨🇩' },
+            { curr: 'USD', sym: '$', name: 'Caisse Dollars ($)', icon: '🇺🇸' },
+            { curr: 'EUR', sym: '€', name: 'Caisse Euros (€)', icon: '🇪🇺' },
+          ].map(({ curr, sym, name, icon }) => {
+            const c = currencies[curr] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
+            const isBase = curr === stats.currency
+            return (
+              <div
+                key={curr}
+                onClick={() => setCurrentView('finances')}
+                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-pointer hover:shadow-sm ${
+                  isBase ? 'bg-primary/5 border-primary/30' : 'bg-card/70 hover:bg-card border-border'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-base shrink-0">{icon}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-xs text-foreground truncate">{name}</span>
+                      {isBase && (
+                        <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 border-primary/40 text-primary font-bold">
+                          Principale
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {c.initialCapital > 0 ? `Capital: ${c.initialCapital.toLocaleString('fr-FR')} ${sym}` : 'Disponible'}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className={`font-mono font-bold text-sm tabular-nums ${c.balance < 0 ? 'text-rose-500' : 'text-foreground'}`}>
+                    {c.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {sym}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Actions rapides - Enhanced with tooltips and pulsing dot */}
       <div>

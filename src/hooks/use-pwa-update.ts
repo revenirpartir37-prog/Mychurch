@@ -67,16 +67,23 @@ export function usePWAUpdate(): PWANotificationState {
   }, [])
 
   const update = useCallback(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
-        if (registration.waiting) {
-          registration.waiting.postMessage({ type: 'SKIP_WAITING' })
-          // Reload after a brief delay to let SW activate
-          setTimeout(() => window.location.reload(), 500)
-        }
-      })
-    }
     setIsUpdateAvailable(false)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+          }
+          registration.update().catch(() => {})
+        })
+        .finally(() => {
+          setTimeout(() => {
+            window.location.reload()
+          }, 300)
+        })
+    } else {
+      window.location.reload()
+    }
   }, [])
 
   return { isUpdateAvailable, version, dismiss, update }

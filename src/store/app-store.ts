@@ -13,6 +13,8 @@ interface AuthState {
   churchLogo: string | null
   firstName: string | null
   lastName: string | null
+  churchCurrency: string | null
+  currencySymbol: string | null
   isAuthenticated: boolean
   verified: boolean
   firebaseUid: string | null
@@ -57,6 +59,8 @@ const initialAuth: AuthState = {
   churchLogo: null,
   firstName: null,
   lastName: null,
+  churchCurrency: null,
+  currencySymbol: null,
   isAuthenticated: false,
   verified: false,
   firebaseUid: null,

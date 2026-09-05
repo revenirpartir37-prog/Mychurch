@@ -33,6 +33,8 @@ export function NotificationsPrompt() {
   const [visible, setVisible] = useState(false)
   const [checking, setChecking] = useState(true)
 
+  const [activating, setActivating] = useState(false)
+
   const checkSubscription = useCallback(async () => {
     const subscribed = await isSubscribed()
     setChecking(false)
@@ -61,9 +63,11 @@ export function NotificationsPrompt() {
   }, [isAuthenticated, checkSubscription])
 
   async function handleAllow() {
+    setActivating(true)
     try {
       await requestPushPermission()
       toast.success('Notifications activées. Bienvenue sur MYCHURCH !')
+      try { localStorage.removeItem(DISMISS_KEY) } catch {}
       setVisible(false)
     } catch (error) {
       const permission = await getPushPermissionState()
@@ -74,6 +78,8 @@ export function NotificationsPrompt() {
       }
       const subscribed = await isSubscribed()
       setVisible(!subscribed)
+    } finally {
+      setActivating(false)
     }
   }
 
@@ -106,9 +112,9 @@ export function NotificationsPrompt() {
               rappels d&apos;événements.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" onClick={handleAllow} className="gap-1.5">
+              <Button size="sm" onClick={handleAllow} disabled={activating} className="gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                Activer maintenant
+                {activating ? 'Activation...' : 'Activer maintenant'}
               </Button>
               <Button size="sm" variant="ghost" onClick={handleDismiss}>
                 Plus tard

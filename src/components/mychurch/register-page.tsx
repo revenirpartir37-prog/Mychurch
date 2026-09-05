@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useAppStore } from '@/store/app-store'
 import { CURRENCY_LABELS, CREATOR } from '@/lib/constants'
+import { normalizeCurrencyCode, currencySymbol } from '@/lib/currency'
 import { toast } from 'sonner'
 import { upsertFirestoreUser, auth as firebaseAuth, firebaseAvailable } from '@/firebase'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
@@ -197,6 +198,9 @@ export function RegisterPage() {
         console.warn('Firestore sync failed on registration:', dbErr)
       })
 
+      const curr = normalizeCurrencyCode(result.church.currency)
+      const sym = currencySymbol(result.church.currency)
+
       setAuth({
         token: result.token,
         refreshToken: result.refreshToken,
@@ -208,6 +212,8 @@ export function RegisterPage() {
         churchLogo: result.church.logo ?? null,
         firstName: result.user.firstName,
         lastName: result.user.lastName,
+        churchCurrency: curr,
+        currencySymbol: sym,
         verified: true,
         firebaseUid: uid,
       })

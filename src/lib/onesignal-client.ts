@@ -108,20 +108,39 @@ export function getOneSignal(): Promise<OneSignalInstance | null> {
 
 // Demande la permission push notifications (à appeler depuis un geste utilisateur).
 export async function requestPushPermission(): Promise<void> {
+  if (typeof window === 'undefined') return
+  if (typeof Notification === 'undefined') {
+    throw new Error('Les notifications ne sont pas supportées sur cet appareil')
+  }
+
+  // 1. Tenter via OneSignal ou l'API native
   const os = await getOneSignal()
-  if (!os) {
-    throw new Error('OneSignal non initialisé')
+  if (os?.Notifications?.requestPermission) {
+    try {
+      await os.Notifications.requestPermission()
+    } catch {
+      await Notification.requestPermission()
+    }
+  } else {
+    await Notification.requestPermission()
   }
 
-  const isSupported = os.Notifications?.isPushSupported?.() ?? false
-  if (!isSupported) {
-    throw new Error('Les notifications push ne sont pas supportées sur cet appareil')
+  // 2. Vérifier la réponse de l'utilisateur
+  if (Notification.permission === 'denied') {
+    throw new Error('Permission de notification refusée dans le navigateur')
   }
 
-  await os.Notifications?.requestPermission()
-  const subscribed = await isSubscribed()
-  if (!subscribed) {
-    throw new Error('Permission refusée ou abonnement inactif')
+  if (Notification.permission !== 'granted') {
+    throw new Error('Permission de notification non accordée')
+  }
+
+  // 3. Tenter l'opt-in OneSignal en tâche de fond sans bloquer l'interface
+  if (os?.User?.PushSubscription?.optIn) {
+    try {
+      await os.User.PushSubscription.optIn()
+    } catch {
+      // Ignorer si la négociation du token push prend un peu de temps
+    }
   }
 }
 
@@ -155,6 +174,10 @@ export async function clearPushUser(): Promise<void> {
 
 // Indique si ce navigateur est déjà abonné au push.
 export async function isSubscribed(): Promise<boolean> {
+  if (typeof window === 'undefined') return false
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    return true
+  }
   const os = await getOneSignal()
   if (!os) return false
   return !!os.User?.PushSubscription?.optedIn
@@ -163,10 +186,6 @@ export async function isSubscribed(): Promise<boolean> {
 export async function getPushPermissionState(): Promise<PushPermissionState> {
   if (typeof window === 'undefined') return 'unsupported'
   if (typeof Notification === 'undefined') return 'unsupported'
-
-  const os = await getOneSignal()
-  const supported = os?.Notifications?.isPushSupported?.() ?? false
-  if (!supported) return 'unsupported'
 
   if (Notification.permission === 'granted') return 'granted'
   if (Notification.permission === 'denied') return 'denied'

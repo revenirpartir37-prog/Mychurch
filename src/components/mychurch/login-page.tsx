@@ -8,6 +8,7 @@ import { useAppStore } from '@/store/app-store'
 import { ROLE_LABELS } from '@/lib/constants'
 import { toast } from 'sonner'
 import { CREATOR } from '@/lib/constants'
+import { normalizeCurrencyCode, currencySymbol } from '@/lib/currency'
 import { auth } from '@/firebase'
 import { onesignalLogin } from '@/components/mychurch/shared/onesignal-provider'
 import { signInWithEmailAndPassword } from 'firebase/auth'
@@ -81,6 +82,9 @@ export function LoginPage() {
         return
       }
 
+      const curr = normalizeCurrencyCode(result.church.currency)
+      const sym = currencySymbol(result.church.currency)
+
       setAuth({
         token: result.token,
         refreshToken: result.refreshToken,
@@ -92,6 +96,8 @@ export function LoginPage() {
         churchLogo: result.church.logo ?? null,
         firstName: result.user.firstName,
         lastName: result.user.lastName,
+        churchCurrency: curr,
+        currencySymbol: sym,
       })
 
       // Associe l'utilisateur à OneSignal pour les push ciblées (id Supabase)

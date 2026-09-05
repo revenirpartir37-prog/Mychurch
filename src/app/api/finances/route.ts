@@ -67,7 +67,13 @@ export async function GET(request: NextRequest) {
 
     if (type) where.type = type
     if (category) where.category = category
-    if (currency) where.currency = currency
+    if (currency) {
+      if (currency === 'CDF') {
+        where.currency = { in: ['CDF', 'FC', 'cdf', 'fc'] }
+      } else {
+        where.currency = currency
+      }
+    }
     if (location) where.location = location
     if (memberId) where.memberId = memberId
 
@@ -127,6 +133,8 @@ export async function GET(request: NextRequest) {
     const nextRefNumber = String(totalCount + 1).padStart(6, '0')
     const nextRefNumberFormatted = `REF-${nextRefNumber}`
 
+    const targetCurrency = (currency && currencies[currency as keyof typeof currencies]) ? currency : baseCurrency
+
     return Response.json({
       transactions,
       pagination: {
@@ -140,9 +148,9 @@ export async function GET(request: NextRequest) {
       nextReferenceNumber: nextRefNumber,
       nextReferenceNumberFormatted: nextRefNumberFormatted,
       totals: {
-        revenue: currencies[baseCurrency as keyof typeof currencies]?.revenue || 0,
-        expense: currencies[baseCurrency as keyof typeof currencies]?.expense || 0,
-        balance: currencies[baseCurrency as keyof typeof currencies]?.balance || 0,
+        revenue: currencies[targetCurrency as keyof typeof currencies]?.revenue || 0,
+        expense: currencies[targetCurrency as keyof typeof currencies]?.expense || 0,
+        balance: currencies[targetCurrency as keyof typeof currencies]?.balance || 0,
       },
     })
   } catch (error) {
@@ -174,7 +182,10 @@ export async function POST(request: NextRequest) {
 
     const currencyTotals = await db.transaction.groupBy({
       by: ['type'],
-      where: { churchId: auth.churchId, currency: targetCurrency },
+      where: {
+        churchId: auth.churchId,
+        currency: targetCurrency === 'CDF' ? { in: ['CDF', 'FC', 'cdf', 'fc'] } : targetCurrency,
+      },
       _sum: { amount: true },
     })
 

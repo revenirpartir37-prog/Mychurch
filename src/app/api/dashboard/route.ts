@@ -1,6 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { normalizeCurrencyCode, SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { normalizeCurrencyCode, currencySymbol, SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { dispatchEventRemindersForChurch } from '@/lib/notification-dispatch'
 import { NextRequest } from 'next/server'
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         : Promise.resolve(null),
       db.transaction.groupBy({
         by: ['type', 'currency'],
-        where: { churchId, date: { gte: startOfYear } },
+        where: { churchId },
         _sum: { amount: true },
       }),
     ])
@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
 
     const baseCurrency = normalizeCurrencyCode(church?.currency)
     const baseInitialCapital = church?.initialCapital || 0
+    const sym = currencySymbol(church?.currency)
 
     const currencies: Record<string, { initialCapital: number; revenue: number; expense: number; balance: number }> = {
       USD: { initialCapital: baseCurrency === 'USD' ? baseInitialCapital : 0, revenue: 0, expense: 0, balance: 0 },
@@ -113,14 +114,24 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     const futureEvents = (upcomingEvents || []).filter((e) => new Date(e.startDate) > now)
 
+    const baseTotals = currencies[baseCurrency] || { initialCapital: 0, revenue: 0, expense: 0, balance: 0 }
+
     return Response.json({
       stats: {
         totalMembers: memberCount,
-        monthlyRevenue: currencies[baseCurrency as keyof typeof currencies]?.revenue || 0,
-        totalExpense: currencies[baseCurrency as keyof typeof currencies]?.expense || 0,
+        balance: baseTotals.balance,
+        initialCapital: baseTotals.initialCapital,
+        monthlyRevenue: baseTotals.revenue,
+        totalRevenue: baseTotals.revenue,
+        totalExpense: baseTotals.expense,
+        currency: baseCurrency,
+        currencySymbol: sym,
         upcomingEvents: futureEvents.length,
         monthlyAttendance: attendanceCount,
       },
+      currencies,
+      churchCurrency: baseCurrency,
+      currencySymbol: sym,
       recentTransactions,
       recentMembers,
       auditLogs,

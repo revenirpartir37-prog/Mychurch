@@ -2,8 +2,8 @@ import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
 import { createSupabaseUser } from '@/lib/supabase'
+import { normalizeCurrencyCode, currencySymbol } from '@/lib/currency'
 import { sendWelcomeEmail } from '@/lib/emails'
-import { normalizeCurrencyCode } from '@/lib/currency'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
     // Garde un hash bcrypt dans la DB pour respecter le champ non-null requirable
     const passwordHash = await bcrypt.hash(data.password, 10)
 
+    const canonCurrency = normalizeCurrencyCode(data.currency)
+    const sym = currencySymbol(data.currency)
+
     // Create church
     const church = await db.church.create({
       data: {
@@ -52,7 +55,7 @@ export async function POST(request: NextRequest) {
         city: data.city,
         province: data.province,
         country: data.country,
-        currency: normalizeCurrencyCode(data.currency),
+        currency: canonCurrency,
         initialCapital: data.initialCapital,
       },
     })
@@ -72,11 +75,30 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Create default church settings
+    // Créer la transaction initiale de capital si renseignée
+    if (data.initialCapital && data.initialCapital > 0) {
+      await db.transaction.create({
+        data: {
+          churchId: church.id,
+          type: 'revenue',
+          category: 'Capital initial',
+          amount: data.initialCapital,
+          currency: canonCurrency,
+          location: 'cash',
+          description: 'Capital initial de la paroisse à la création',
+          date: new Date(),
+          recordedByName: `${user.firstName} ${user.lastName}`,
+          referenceNumber: 'REF-INIT01',
+          createdBy: user.id,
+        },
+      })
+    }
+
+    // Create default church settings with correct currency symbol
     const defaultSettings = [
       { key: 'primaryColor', value: '#6366f1' },
       { key: 'secondaryColor', value: '#8b5cf6' },
-      { key: 'currencySymbol', value: '$' },
+      { key: 'currencySymbol', value: sym },
       { key: 'dateFormat', value: 'MM/dd/yyyy' },
       { key: 'timeFormat', value: '12h' },
       { key: 'language', value: 'en' },
