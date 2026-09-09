@@ -184,9 +184,9 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Plan invalide' }, { status: 400 })
     }
 
-    // Facturation directe en USD
-    const paymentAmount = usdAmount
-    const paymentCurrency = 'USD'
+    // GeniusPay ne supporte que XOF
+    const paymentAmount = usdToXof(usdAmount)
+    const paymentCurrency = 'XOF'
 
     const startDate = new Date()
     const endDate = new Date()
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     const paymentParams: any = {
       amount: paymentAmount,
       currency: paymentCurrency,
-      description: `[${paymentAmount} $ USD] Abonnement ${data.plan === 'monthly' ? 'Mensuel (50 $ USD)' : data.plan === 'annual' ? 'Annuel (100 $ USD)' : 'Affilié (30 $ USD)'} MYCHURCH (${targetChurch.name})`,
+      description: `[${paymentAmount} XOF = ${usdAmount} $ USD] Abonnement ${data.plan === 'monthly' ? 'Mensuel (50 $ USD)' : data.plan === 'annual' ? 'Annuel (100 $ USD)' : 'Affilié (30 $ USD)'} MYCHURCH (${targetChurch.name})`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,

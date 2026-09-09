@@ -26,15 +26,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = initiatePaymentSchema.parse(body)
 
-    // Facturation et affichage directs en USD ($) sur GeniusPay
+    // GeniusPay ne supporte que XOF — on convertit le prix USD → XOF
     let finalAmount: number
-    const finalCurrency = 'USD'
+    const finalCurrency = 'XOF'
 
     if (data.paymentType === 'subscription') {
       const usdAmount = data.plan === 'annual' ? PRICING_USD.annual : PRICING_USD.monthly
-      finalAmount = usdAmount
+      finalAmount = usdToXof(usdAmount)
     } else {
-      finalAmount = PRICING_USD.memberCard
+      finalAmount = usdToXof(PRICING_USD.memberCard)
     }
 
     // Get user info for customer details
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const paymentResponse = await createPayment({
       amount: finalAmount,
       currency: finalCurrency,
-      description: data.description,
+      description: `${data.description} (${finalAmount} XOF)`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,

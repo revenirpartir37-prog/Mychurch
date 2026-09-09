@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const paymentParams: any = {
       amount: paymentAmount,
       currency: paymentCurrency,
-      description: `[10 $ USD] Carte membre - ${member.firstName} ${member.lastName}`,
+      description: `[${paymentAmount} XOF = 10 $ USD] Carte membre - ${member.firstName} ${member.lastName}`,
       customer: {
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
