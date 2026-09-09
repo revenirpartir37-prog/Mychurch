@@ -21,38 +21,44 @@ export async function POST(request: NextRequest) {
     if (event === 'payment.completed' && data?.reference) {
       const reference = data.reference
 
-      // Update subscription payment status
+      // Idempotency: check if already processed
+      const existingOrder = await db.cardOrder.findUnique({
+        where: { geniusReference: reference },
+        select: { status: true },
+      })
+      const alreadyCompleted = existingOrder?.status === 'completed'
+
+      // Update subscription payment status (idempotent)
       await db.subscription.updateMany({
-        where: { paymentRef: reference },
+        where: { paymentRef: reference, paymentStatus: { not: 'completed' } },
         data: { paymentStatus: 'completed', status: 'active' },
       })
 
-      // Update member card payment status (legacy single-card flow)
+      // Update member card payment status (idempotent)
       await db.memberCard.updateMany({
-        where: { paymentRef: reference },
+        where: { paymentRef: reference, isPaid: false },
         data: { isPaid: true },
       })
 
-      // Handle CardOrder + CardCredit (bundle flow)
-      const order = await db.cardOrder.findUnique({
-        where: { geniusReference: reference },
-      })
-
-      if (order && order.status !== 'completed') {
+      // Handle CardOrder + CardCredit (bundle flow) — only if not already completed
+      const fullOrder = existingOrder && !alreadyCompleted
+        ? await db.cardOrder.findUnique({ where: { geniusReference: reference } })
+        : null
+      if (fullOrder) {
         await db.$transaction([
           db.cardOrder.update({
-            where: { id: order.id },
+            where: { id: fullOrder.id },
             data: { status: 'completed', completedAt: new Date() },
           }),
           db.cardCredit.upsert({
-            where: { userId: order.userId },
+            where: { userId: fullOrder.userId },
             create: {
-              userId: order.userId,
-              totalPurchased: order.quantity,
+              userId: fullOrder.userId,
+              totalPurchased: fullOrder.quantity,
               totalGenerated: 0,
             },
             update: {
-              totalPurchased: { increment: order.quantity },
+              totalPurchased: { increment: fullOrder.quantity },
             },
           }),
         ])

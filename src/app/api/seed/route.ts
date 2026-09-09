@@ -1,10 +1,19 @@
 import { db } from '@/lib/db'
-import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import { NextRequest, NextResponse } from 'next/server'
 
-// POST /api/seed — Populate demo data for the test church
-export async function POST() {
+const SEED_SECRET = process.env.SEED_SECRET || ''
+
+// POST /api/seed — Populate demo data for the test church (protected by SEED_SECRET)
+export async function POST(request: NextRequest) {
   try {
+    // Protection: only allow if SEED_SECRET is set and matches
+    if (!SEED_SECRET) {
+      return NextResponse.json({ error: 'Seed endpoint disabled' }, { status: 403 })
+    }
+    const authHeader = request.headers.get('authorization')?.replace('Bearer ', '')
+    if (authHeader !== SEED_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const church = await db.church.findFirst({
       where: { email: 'grace@eglise.com' },
     })
