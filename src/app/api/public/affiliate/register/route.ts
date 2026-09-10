@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const isParentActive = parentSub && parentSub.plan !== 'trial' && new Date(parentSub.endDate) > new Date()
     if (!isParentActive) {
       return Response.json({
-        error: 'Le Siège de votre réseau doit avoir un abonnement actif (50 $ / mois ou 100 $ / an) pour enregistrer de nouvelles églises affiliées (non disponible en essai gratuit).',
+        error: 'Le Siège de votre réseau doit avoir un abonnement actif pour enregistrer de nouvelles églises affiliées.',
       }, { status: 403 })
     }
 

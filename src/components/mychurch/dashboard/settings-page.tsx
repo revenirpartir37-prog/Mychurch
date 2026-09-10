@@ -344,7 +344,7 @@ function SubscriptionTab() {
                       Abonnement Permanent à Vie Activé
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Accès complet et gratuit à l&apos;application. Seuls l&apos;affiliation et les cartes restent payants.
+                      Accès complet et gratuit à l&apos;application + système d&apos;affiliation inclus. Seules les cartes de membres restent payantes (10 $/carte).
                     </p>
                   </div>
                 </div>
@@ -528,7 +528,7 @@ function SubscriptionTab() {
               <Info className="w-4 h-4 text-amber-500 shrink-0" /> Précision importante sur l&apos;abonnement à vie :
             </p>
             <p className="leading-relaxed">
-              Dans cet abonnement à vie, vous pourrez <strong>tout utiliser gratuitement</strong> dans l&apos;application sans aucune limite de temps. La seule chose qui reste payante, c&apos;est <strong>l&apos;affiliation de nouvelles églises</strong> (50 $ / mois ou 100 $ / an pour ouvrir le réseau) et <strong>la commande des cartes de membres</strong> (10 $ / carte).
+              Dans cet abonnement à vie, vous pourrez <strong>tout utiliser gratuitement</strong> dans l&apos;application sans aucune limite de temps, y compris <strong>le système d&apos;affiliation</strong>. La seule chose qui reste payante, c&apos;est <strong>la commande des cartes de membres</strong> (10 $ / carte).
             </p>
           </div>
         </CardContent>
