@@ -39,6 +39,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
 import { authFetch } from '@/lib/auth-fetch'
+import { PaymentConfirmDialog } from '@/components/mychurch/shared/payment-confirm-dialog'
 import { toast } from 'sonner'
 
 function formatUsd(amount: number) {
@@ -101,6 +102,7 @@ export function MemberCardsPage() {
   const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [purchaseQuantity, setPurchaseQuantity] = useState(1)
   const [purchasing, setPurchasing] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   // Pending orders state
   const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([])
@@ -1014,7 +1016,7 @@ export function MemberCardsPage() {
               Annuler
             </Button>
             <Button
-              onClick={handlePurchaseCards}
+              onClick={() => setConfirmOpen(true)}
               disabled={purchasing || purchaseQuantity < 1}
               className="gap-2"
             >
@@ -1028,6 +1030,16 @@ export function MemberCardsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PaymentConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={() => { setConfirmOpen(false); handlePurchaseCards() }}
+        title="Confirmer l'achat des cartes"
+        description={`${purchaseQuantity} carte${purchaseQuantity !== 1 ? 's' : ''} de membre à ${formatUsd(purchaseTotal)} $ USD`}
+        amountUsd={purchaseTotal}
+        loading={purchasing}
+      />
     </div>
   )
 }

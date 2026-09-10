@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { authFetch } from '@/lib/auth-fetch'
+import { PaymentConfirmDialog } from '@/components/mychurch/shared/payment-confirm-dialog'
 import { CREATOR, ROLE_LABELS, CURRENCY_LABELS, APP_VERSION, type Currency } from '@/lib/constants'
 import { uploadImage } from '@/lib/upload-image'
 import { useTheme } from 'next-themes'
@@ -173,6 +174,7 @@ function SubscriptionTab() {
   const [sub, setSub] = useState<SubStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual' | 'annual_branch'>('annual')
 
@@ -484,7 +486,7 @@ function SubscriptionTab() {
           <Button
             className="w-full sm:w-auto gap-2 font-bold shrink-0"
             disabled={paying}
-            onClick={() => handlePay(selectedPlan)}
+            onClick={() => setConfirmOpen(true)}
           >
             {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {isActive ? 'Renouveler' : 'Souscrire'} ({selectedPlan === 'monthly' ? '50 $' : selectedPlan === 'annual' ? '100 $' : '30 $'})
@@ -544,6 +546,16 @@ function SubscriptionTab() {
           </div>
         </CardContent>
       </Card>
+
+      <PaymentConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={() => { setConfirmOpen(false); handlePay(selectedPlan) }}
+        title={isActive ? 'Renouveler l\'abonnement' : 'Souscrire à un abonnement'}
+        description={`Formule ${selectedPlan === 'monthly' ? 'Mensuelle' : selectedPlan === 'annual' ? 'Annuelle' : 'Extension Réseau'} — ${selectedPlan === 'monthly' ? '50 $ USD' : selectedPlan === 'annual' ? '100 $ USD' : '30 $ USD'}`}
+        amountUsd={selectedPlan === 'monthly' ? 50 : selectedPlan === 'annual' ? 100 : 30}
+        loading={paying}
+      />
     </div>
   )
 }

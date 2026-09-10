@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { authFetch } from '@/lib/auth-fetch'
+import { PaymentConfirmDialog } from '@/components/mychurch/shared/payment-confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -58,6 +59,9 @@ export function NetworkPage() {
   const [renewModalOpen, setRenewModalOpen] = useState(false)
   const [selectedBranch, setSelectedBranch] = useState<AffiliateBranch | null>(null)
   const [paying, setPaying] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmPlan, setConfirmPlan] = useState<'monthly' | 'annual'>('annual')
+  const [branchConfirmOpen, setBranchConfirmOpen] = useState(false)
 
   const fetchAffiliates = async () => {
     setLoading(true)
@@ -251,7 +255,7 @@ export function NetworkPage() {
             <Button
               className="bg-primary hover:bg-primary/90 text-white font-bold gap-2 text-xs flex-1"
               disabled={paying}
-              onClick={() => handlePayHQ('annual')}
+              onClick={() => { setConfirmPlan('annual'); setConfirmOpen(true) }}
             >
               <Sparkles className="w-4 h-4" /> Activer l&apos;affiliation (100 $ / an - Recommandé)
             </Button>
@@ -259,7 +263,7 @@ export function NetworkPage() {
               variant="outline"
               className="border-primary/30 text-primary hover:bg-primary/10 font-semibold gap-2 text-xs flex-1"
               disabled={paying}
-              onClick={() => handlePayHQ('monthly')}
+              onClick={() => { setConfirmPlan('monthly'); setConfirmOpen(true) }}
             >
               Activer l&apos;affiliation (50 $ / mois)
             </Button>
@@ -403,7 +407,7 @@ export function NetworkPage() {
               <Button
                 className="w-full bg-emerald-600 hover:bg-emerald-500 gap-2"
                 disabled={paying}
-                onClick={handlePayBranchRenewal}
+                onClick={() => setBranchConfirmOpen(true)}
               >
                 <RefreshCw className={`w-4 h-4 ${paying ? 'animate-spin' : ''}`} />
                 Payer le renouvellement (30 $)
@@ -412,6 +416,26 @@ export function NetworkPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <PaymentConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={() => { setConfirmOpen(false); handlePayHQ(confirmPlan) }}
+        title="Activer l'affiliation"
+        description={`Abonnement Siège ${confirmPlan === 'annual' ? 'Annuel — 100 $ USD' : 'Mensuel — 50 $ USD'}`}
+        amountUsd={confirmPlan === 'annual' ? 100 : 50}
+        loading={paying}
+      />
+
+      <PaymentConfirmDialog
+        open={branchConfirmOpen}
+        onOpenChange={setBranchConfirmOpen}
+        onConfirm={() => { setBranchConfirmOpen(false); handlePayBranchRenewal() }}
+        title="Renouveler la paroisse affiliée"
+        description={`Renouvellement annuel — 30 $ USD${selectedBranch ? ` pour ${selectedBranch.name}` : ''}`}
+        amountUsd={30}
+        loading={paying}
+      />
     </div>
   )
 }
