@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { code } = redeemCodeSchema.parse(body)
 
-    const expectedAdminCode = process.env.ADMIN_LIFETIME_CODE?.trim()
+    const expectedAdminCode = process.env.ADMIN_LIFETIME_CODE?.trim().replace(/^["']|["']$/g, '')
 
     if (!expectedAdminCode || code.trim() !== expectedAdminCode) {
       return Response.json({ error: 'Code administrateur invalide ou non reconnu' }, { status: 400 })
