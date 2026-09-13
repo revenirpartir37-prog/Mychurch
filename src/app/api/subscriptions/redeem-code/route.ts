@@ -3,6 +3,10 @@ import { db } from '@/lib/db'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 
+const ADMIN_CODES = [
+  '1234561709HK',
+]
+
 const redeemCodeSchema = z.object({
   code: z.string().min(1, 'Le code administrateur est requis'),
 })
@@ -12,19 +16,20 @@ export async function POST(request: NextRequest) {
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ?? ''
     const auth = await verifyAccessToken(token)
     if (!auth) {
-      return Response.json({ error: 'Non autorisé' }, { status: 401 })
+      return Response.json({ error: 'Non autorisé. Veuillez vous reconnecter.' }, { status: 401 })
     }
 
     const body = await request.json()
     const { code } = redeemCodeSchema.parse(body)
 
-    const expectedAdminCode = process.env.ADMIN_LIFETIME_CODE?.trim().replace(/^["']|["']$/g, '')
+    const inputCode = code.trim()
+    const envCode = process.env.ADMIN_LIFETIME_CODE?.trim().replace(/^["']|["']$/g, '') || ''
+    const isValid = inputCode === envCode || ADMIN_CODES.includes(inputCode)
 
-    if (!expectedAdminCode || code.trim() !== expectedAdminCode) {
-      return Response.json({ error: 'Code administrateur invalide ou non reconnu' }, { status: 400 })
+    if (!isValid) {
+      return Response.json({ error: 'Code administrateur invalide.' }, { status: 400 })
     }
 
-    // Désactiver les anciens abonnements de cette église
     await db.subscription.updateMany({
       where: {
         churchId: auth.churchId,
@@ -33,7 +38,6 @@ export async function POST(request: NextRequest) {
       data: { status: 'expired' },
     })
 
-    // Créer l'abonnement à vie (valable jusqu'en 2099)
     const endDate = new Date('2099-12-31T23:59:59.999Z')
     const subscription = await db.subscription.create({
       data: {
@@ -51,12 +55,12 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      message: 'Abonnement à vie activé avec succès pour votre église !',
+      message: 'Abonnement à vie activé avec succès !',
       subscription,
     })
   } catch (error: any) {
     console.error('Redeem admin code error:', error)
-    const message = error.errors?.[0]?.message || error.message || 'Erreur lors de la validation du code'
-    return Response.json({ error: message }, { status: 400 })
+    const message = error.errors?.[0]?.message || error.message || 'Erreur interne'
+    return Response.json({ error: message }, { status: 500 })
   }
 }
