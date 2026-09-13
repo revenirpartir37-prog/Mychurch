@@ -24,33 +24,33 @@ export async function POST(request: NextRequest) {
       // Idempotency: check if already processed
       const existingOrder = await db.cardOrder.findUnique({
         where: { geniusReference: reference },
-        select: { status: true },
       })
       const alreadyCompleted = existingOrder?.status === 'completed'
 
-      // Update subscription payment status (idempotent)
-      await db.subscription.updateMany({
-        where: { paymentRef: reference, paymentStatus: { not: 'completed' } },
-        data: { paymentStatus: 'completed', status: 'active' },
-      })
-
-      // Update member card payment status (idempotent)
-      await db.memberCard.updateMany({
-        where: { paymentRef: reference, isPaid: false },
-        data: { isPaid: true },
-      })
-
-      // Handle CardOrder + CardCredit (bundle flow) — only if not already completed
-      const fullOrder = existingOrder && !alreadyCompleted
-        ? await db.cardOrder.findUnique({ where: { geniusReference: reference } })
-        : null
-      if (fullOrder) {
-        await db.$transaction([
-          db.cardOrder.update({
+      await db.$transaction(async (tx) => {
+        const webhook = await tx.paymentWebhook.createMany({
+          data: { reference, event },
+          skipDuplicates: true,
+        })
+        if (webhook.count === 0) return
+        await tx.subscription.updateMany({
+          where: { paymentRef: reference, paymentStatus: { not: 'completed' } },
+          data: { paymentStatus: 'completed', status: 'active' },
+        })
+        await tx.memberCard.updateMany({
+          where: { paymentRef: reference, isPaid: false },
+          data: { isPaid: true },
+        })
+        const fullOrder = existingOrder && !alreadyCompleted
+          ? await tx.cardOrder.findFirst({ where: { geniusReference: reference, status: 'pending' } })
+          : null
+        if (!fullOrder) return
+        await Promise.all([
+          tx.cardOrder.update({
             where: { id: fullOrder.id },
             data: { status: 'completed', completedAt: new Date() },
           }),
-          db.cardCredit.upsert({
+          tx.cardCredit.upsert({
             where: { userId: fullOrder.userId },
             create: {
               userId: fullOrder.userId,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
             },
           }),
         ])
-      }
+      })
     } else if (event === 'payment.failed' && data?.reference) {
       const reference = data.reference
 

@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     const totals = ok(results[9]) ?? []
 
     const baseCurrency = normalizeCurrencyCode(church?.currency)
-    const baseInitialCapital = church?.initialCapital || 0
+    const baseInitialCapital = Number(church?.initialCapital || 0)
     const sym = currencySymbol(church?.currency)
 
     const currencies: Record<string, { initialCapital: number; revenue: number; expense: number; balance: number }> = {
@@ -102,8 +102,8 @@ export async function GET(request: NextRequest) {
     for (const item of totals) {
       const curr = normalizeCurrencyCode(item.currency) as 'USD' | 'EUR' | 'CDF'
       if (currencies[curr]) {
-        if (item.type === 'revenue') currencies[curr].revenue += item._sum.amount || 0
-        if (item.type === 'expense') currencies[curr].expense += item._sum.amount || 0
+        if (item.type === 'revenue') currencies[curr].revenue += Number(item._sum.amount || 0)
+        if (item.type === 'expense') currencies[curr].expense += Number(item._sum.amount || 0)
       }
     }
 

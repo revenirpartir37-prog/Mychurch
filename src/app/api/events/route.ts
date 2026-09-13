@@ -1,4 +1,4 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import {
@@ -9,22 +9,14 @@ import {
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
-async function getAuth(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
-
 const createEventSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional().nullable(),
   type: z.enum(['culte', 'reunion', 'seminar', 'conference', 'formation'], {
     message: 'Invalid event type',
   }),
-  startDate: z.string().min(1, 'Start date is required'),
-  endDate: z.string().optional().nullable(),
+  startDate: z.string().datetime({ offset: true }),
+  endDate: z.string().datetime({ offset: true }).optional().nullable(),
   location: z.string().optional().nullable(),
 })
 
@@ -32,15 +24,15 @@ const updateEventSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
   type: z.enum(['culte', 'reunion', 'seminar', 'conference', 'formation']).optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().nullable().optional(),
+  startDate: z.string().datetime({ offset: true }).optional(),
+  endDate: z.string().datetime({ offset: true }).nullable().optional(),
   location: z.string().optional().nullable(),
 })
 
 // GET: List events with filters
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -94,13 +86,18 @@ export async function GET(request: NextRequest) {
 // POST: Create event
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
     const data = createEventSchema.parse(body)
+    const startDate = new Date(data.startDate)
+    const endDate = data.endDate ? new Date(data.endDate) : null
+    if (endDate && endDate < startDate) {
+      return Response.json({ error: 'La date de fin doit être postérieure au début' }, { status: 400 })
+    }
 
     const event = await db.event.create({
       data: {
@@ -108,8 +105,8 @@ export async function POST(request: NextRequest) {
         title: data.title,
         description: data.description || null,
         type: data.type,
-        startDate: new Date(data.startDate),
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        startDate,
+        endDate,
         location: data.location || null,
         createdBy: auth.userId,
       },
@@ -159,7 +156,7 @@ export async function POST(request: NextRequest) {
 // PUT: Update event
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -172,6 +169,9 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     const data = updateEventSchema.parse(body)
+    if (data.startDate && data.endDate && new Date(data.endDate) < new Date(data.startDate)) {
+      return Response.json({ error: 'La date de fin doit être postérieure au début' }, { status: 400 })
+    }
 
     const existing = await db.event.findFirst({
       where: { id, churchId: auth.churchId },
@@ -189,7 +189,7 @@ export async function PUT(request: NextRequest) {
     if (data.location !== undefined) updateData.location = data.location
 
     const event = await db.event.update({
-      where: { id },
+      where: { id: existing.id },
       data: updateData,
     })
 
@@ -237,7 +237,7 @@ export async function PUT(request: NextRequest) {
 // DELETE: Delete event
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -255,7 +255,7 @@ export async function DELETE(request: NextRequest) {
       return Response.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    await db.event.delete({ where: { id } })
+    await db.event.deleteMany({ where: { id, churchId: auth.churchId } })
 
     // Log audit
     createAuditLog({

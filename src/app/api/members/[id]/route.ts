@@ -1,21 +1,13 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { NextRequest } from 'next/server'
-
-async function getAuth(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -68,7 +60,7 @@ export async function GET(
     const attendanceRate = totalEvents > 0 ? Math.round((attendedCount / totalEvents) * 100) : 0
 
     // Calculate financial stats
-    const totalContributions = transactions.reduce((sum, t) => sum + t.amount, 0)
+    const totalContributions = transactions.reduce((sum, t) => sum + Number(t.amount), 0)
     const contributionCount = transactions.length
     const averageContribution = contributionCount > 0 ? totalContributions / contributionCount : 0
 

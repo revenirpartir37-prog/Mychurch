@@ -17,7 +17,7 @@ model Church {
   province    String
   country     String
   currency    String   @default("USD")
-  initialCapital Float  @default(0)
+  initialCapital Decimal @db.Decimal(14, 2) @default(0)
   email       String   @unique
   phone       String?
   logo        String?
@@ -92,7 +92,7 @@ model Member {
   address     String?
   department  String?
   function    String?
-  salary      Float?
+  salary      Decimal? @db.Decimal(14, 2)
   emergencyContactName  String?
   emergencyContactPhone String?
   photo       String?
@@ -118,7 +118,7 @@ model Transaction {
   churchId    String
   type        String   // revenue, expense
   category    String   // offering, tithe, donation, contribution, salary, water, electricity, internet, etc.
-  amount      Float
+  amount      Decimal @db.Decimal(14, 2)
   currency    String   @default("USD")
   location    String   @default("cash") // bank, cash
   description String?
@@ -175,6 +175,7 @@ model Attendance {
   @@index([churchId, memberId])
   @@index([eventId])
   @@index([churchId, date])
+  @@unique([eventId, memberId])
 }
 
 // ==================== MESSAGE ====================
@@ -225,7 +226,7 @@ model MemberCard {
   cardNumber  String   @unique
   qrCode      String
   isPaid      Boolean  @default(false)
-  paidAmount  Float    @default(0)
+  paidAmount  Decimal  @db.Decimal(14, 2) @default(0)
   paymentRef  String?
   createdAt   DateTime @default(now())
 
@@ -245,7 +246,7 @@ model Subscription {
   status        String   @default("active") // active, expired, cancelled
   startDate     DateTime @default(now())
   endDate       DateTime
-  amount        Float
+  amount        Decimal @db.Decimal(14, 2)
   currency      String   @default("USD")
   paymentRef    String?
   paymentStatus String   @default("pending") // pending, completed, failed
@@ -323,7 +324,7 @@ model Archive {
 model Debt {
   id              String   @id @default(cuid())
   churchId        String
-  amount          Float
+  amount          Decimal @db.Decimal(14, 2)
   currency        String   @default("USD")
   creditor        String
   description     String?
@@ -343,7 +344,7 @@ model Debt {
 model DebtPayment {
   id        String   @id @default(cuid())
   debtId    String
-  amount    Float
+  amount    Decimal @db.Decimal(14, 2)
   date      DateTime @default(now())
   createdBy String
   createdAt DateTime @default(now())
@@ -356,8 +357,8 @@ model CardOrder {
   id              String   @id @default(cuid())
   userId          String
   quantity        Int
-  unitPriceUsd    Float    @default(10)
-  totalPriceUsd   Float
+  unitPriceUsd    Decimal  @db.Decimal(14, 2) @default(10)
+  totalPriceUsd   Decimal  @db.Decimal(14, 2)
   geniusReference String?  @unique
   status          String   @default("pending") // pending, completed, failed, expired
   createdAt       DateTime @default(now())
@@ -373,4 +374,14 @@ model CardCredit {
   totalPurchased Int      @default(0)
   totalGenerated Int      @default(0)
   updatedAt      DateTime @updatedAt
+}
+
+model PaymentWebhook {
+  id          String   @id @default(cuid())
+  reference   String
+  event       String
+  receivedAt  DateTime @default(now())
+
+  @@unique([reference, event])
+  @@index([receivedAt])
 }

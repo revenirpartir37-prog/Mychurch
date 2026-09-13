@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       roles: ['admin', 'secretary'],
     }).catch((e) => console.warn('notifyChurchUsers public register failed:', e))
 
-    return Response.json({ success: true, member }, { status: 201 })
+    return Response.json({ success: true, id: member.id }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return Response.json({ error: 'Validation failed', details: error.issues }, { status: 400 })

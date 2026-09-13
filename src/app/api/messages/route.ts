@@ -1,17 +1,9 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { notifyUser } from '@/lib/notification-dispatch'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
-
-async function getAuth(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
 
 const sendMessageSchema = z.object({
   receiverId: z.string().min(1, 'Receiver ID is required'),
@@ -28,7 +20,7 @@ const updateMessageSchema = z.object({
 // GET: List messages for current user
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -87,7 +79,7 @@ export async function POST(request: NextRequest) {
     const rlKey = token ? `msg:${token.slice(-12)}` : `msg:${request.headers.get('x-forwarded-for') || 'anon'}`
     const rl = rateLimit(rlKey, 20, 60_000)
     if (!rl.ok) return Response.json({ error: 'Trop de messages, patientez' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) } })
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -141,7 +133,7 @@ export async function POST(request: NextRequest) {
 // PUT: Mark as read / archive
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }

@@ -1,7 +1,12 @@
 import { SignJWT, jwtVerify } from 'jose'
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'mychurch-super-secret-key-change-in-production-2024')
-const REFRESH_SECRET = new TextEncoder().encode(process.env.JWT_REFRESH_SECRET || 'mychurch-refresh-secret-key-change-in-production-2024')
+function requiredSecret(name: string): Uint8Array {
+  const value = process.env[name]
+  if (!value || value.length < 32) {
+    throw new Error(`${name} must be configured with at least 32 characters`)
+  }
+  return new TextEncoder().encode(value)
+}
 
 export interface JWTPayload {
   userId: string
@@ -16,7 +21,7 @@ export async function generateAccessToken(payload: JWTPayload): Promise<string> 
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('24h')
-    .sign(JWT_SECRET)
+    .sign(requiredSecret('JWT_SECRET'))
 }
 
 export async function generateRefreshToken(userId: string): Promise<string> {
@@ -24,7 +29,7 @@ export async function generateRefreshToken(userId: string): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('30d')
-    .sign(REFRESH_SECRET)
+    .sign(requiredSecret('JWT_REFRESH_SECRET'))
 }
 
 export function isJwtExpired(token: string | null): boolean {
@@ -54,7 +59,7 @@ export async function verifyAccessToken(token: string): Promise<JWTPayload | nul
   }
   if (isJwtExpired(token)) return null
   try {
-    const { payload } = await jwtVerify(token.trim(), JWT_SECRET)
+    const { payload } = await jwtVerify(token.trim(), requiredSecret('JWT_SECRET'))
     if (!payload || !payload.userId || !payload.churchId) return null
     return payload as unknown as JWTPayload
   } catch {
@@ -64,7 +69,7 @@ export async function verifyAccessToken(token: string): Promise<JWTPayload | nul
 
 export async function verifyRefreshToken(token: string): Promise<{ userId: string } | null> {
   try {
-    const { payload } = await jwtVerify(token, REFRESH_SECRET)
+    const { payload } = await jwtVerify(token, requiredSecret('JWT_REFRESH_SECRET'))
     return payload as unknown as { userId: string }
   } catch {
     return null

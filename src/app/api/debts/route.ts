@@ -1,17 +1,9 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { notifyChurchUsers, notifyUser, notifyUsers } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
-
-async function getAuth(req: NextRequest) {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
 
 const createSchema = z.object({
   amount: z.number().positive(),
@@ -28,13 +20,13 @@ const approveSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status') || undefined
     const page = Math.max(1, Number(searchParams.get('page') || 1))
     const limit = Math.min(100, Number(searchParams.get('limit') || 20))
-    const where: any = { churchId: auth.churchId }
+    const where: { churchId: string; status?: string } = { churchId: auth.churchId }
     if (status) where.status = status
     const [debts, total, pendingCount] = await Promise.all([
       db.debt.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit, include: { payments: true } }),
@@ -50,7 +42,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin' && auth.role !== 'treasurer') return Response.json({ error: 'Forbidden' }, { status: 403 })
     const body = await req.json()
@@ -102,7 +94,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
     const body = await req.json()
@@ -110,7 +102,7 @@ export async function PATCH(req: NextRequest) {
     const existing = await db.debt.findFirst({ where: { id: data.debtId, churchId: auth.churchId } })
     if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
     if (existing.status !== 'pending') return Response.json({ error: 'Not pending' }, { status: 409 })
-    const debt = await db.debt.update({ where: { id: data.debtId }, data: { status: data.action, approvedBy: auth.userId, approvalComment: data.comment ?? null } })
+    const debt = await db.debt.update({ where: { id: existing.id }, data: { status: data.action, approvedBy: auth.userId, approvalComment: data.comment ?? null } })
     const label = data.action === 'approved' ? 'approuvée ✅' : 'rejetée ❌'
     notifyUser({
       churchId: auth.churchId,
@@ -139,7 +131,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
     const { searchParams } = new URL(req.url)
@@ -148,7 +140,7 @@ export async function DELETE(req: NextRequest) {
     const existing = await db.debt.findFirst({ where: { id, churchId: auth.churchId } })
     if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
     await db.debtPayment.deleteMany({ where: { debtId: id } })
-    await db.debt.delete({ where: { id } })
+    await db.debt.deleteMany({ where: { id, churchId: auth.churchId } })
     createAuditLog({ churchId: auth.churchId, userId: auth.userId, action: 'debt_deleted', details: `ID: ${id}` })
     return Response.json({ success: true })
   } catch (e) {

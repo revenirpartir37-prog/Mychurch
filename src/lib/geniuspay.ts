@@ -266,6 +266,9 @@ export function verifyWebhookSignature(
   timestamp: string,
   secret: string
 ): boolean {
+  if (!secret || !signature || !timestamp) return false
+  const timestampMs = Number(timestamp) * 1000
+  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) return false
   const expectedSignature = createHmac('sha256', secret)
     .update(`${timestamp}.${payload}`)
     .digest('hex')

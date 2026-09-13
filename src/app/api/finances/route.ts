@@ -1,18 +1,10 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { normalizeCurrencyCode, SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { notifyChurchUsers, notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
-
-async function getAuth(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
 
 const createTransactionSchema = z.object({
   type: z.enum(['revenue', 'expense'], { message: 'Type must be revenue or expense' }),
@@ -47,7 +39,7 @@ const updateTransactionSchema = z.object({
 // GET: List transactions with filters and multi-currency balances
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -91,7 +83,7 @@ export async function GET(request: NextRequest) {
     })
 
     const baseCurrency = normalizeCurrencyCode(church?.currency)
-    const baseInitialCapital = church?.initialCapital || 0
+    const baseInitialCapital = Number(church?.initialCapital || 0)
 
     const [transactions, total, multiCurrencyTotals, totalCount] = await Promise.all([
       db.transaction.findMany({
@@ -120,8 +112,8 @@ export async function GET(request: NextRequest) {
     for (const item of multiCurrencyTotals) {
       const curr = normalizeCurrencyCode(item.currency) as 'USD' | 'EUR' | 'CDF'
       if (currencies[curr]) {
-        if (item.type === 'revenue') currencies[curr].revenue += item._sum.amount || 0
-        if (item.type === 'expense') currencies[curr].expense += item._sum.amount || 0
+        if (item.type === 'revenue') currencies[curr].revenue += Number(item._sum.amount || 0)
+        if (item.type === 'expense') currencies[curr].expense += Number(item._sum.amount || 0)
       }
     }
 
@@ -162,7 +154,7 @@ export async function GET(request: NextRequest) {
 // POST: Create transaction with currency balance check & 6-digit reference validation
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -178,7 +170,7 @@ export async function POST(request: NextRequest) {
     })
 
     const baseCurrency = normalizeCurrencyCode(church?.currency)
-    const initialCapital = baseCurrency === targetCurrency ? (church?.initialCapital || 0) : 0
+    const initialCapital = baseCurrency === targetCurrency ? Number(church?.initialCapital || 0) : 0
 
     const currencyTotals = await db.transaction.groupBy({
       by: ['type'],
@@ -192,8 +184,8 @@ export async function POST(request: NextRequest) {
     let currentRevenue = 0
     let currentExpense = 0
     for (const item of currencyTotals) {
-      if (item.type === 'revenue') currentRevenue = item._sum.amount || 0
-      if (item.type === 'expense') currentExpense = item._sum.amount || 0
+      if (item.type === 'revenue') currentRevenue = Number(item._sum.amount || 0)
+      if (item.type === 'expense') currentExpense = Number(item._sum.amount || 0)
     }
 
     const availableBalance = initialCapital + currentRevenue - currentExpense
@@ -291,7 +283,7 @@ export async function POST(request: NextRequest) {
 // PUT: Update transaction
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -328,7 +320,7 @@ export async function PUT(request: NextRequest) {
     if (data.signatureData !== undefined) updateData.signatureData = data.signatureData
 
     const transaction = await db.transaction.update({
-      where: { id },
+      where: { id: existing.id },
       data: updateData,
       include: { member: { select: { id: true, firstName: true, lastName: true } } },
     })
@@ -373,7 +365,7 @@ export async function PUT(request: NextRequest) {
 // DELETE: Delete transaction (admin or treasurer only)
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth || !auth.churchId || !auth.userId) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -396,7 +388,7 @@ export async function DELETE(request: NextRequest) {
       return Response.json({ error: 'Transaction not found' }, { status: 404 })
     }
 
-    await db.transaction.delete({ where: { id } })
+    await db.transaction.deleteMany({ where: { id, churchId: auth.churchId } })
 
     // Log audit
     createAuditLog({

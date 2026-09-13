@@ -2,14 +2,18 @@ import { db } from '@/lib/db'
 import { NextRequest } from 'next/server'
 import { createServiceClient, SUPABASE_BUCKET } from '@/lib/supabase'
 import { randomUUID } from 'crypto'
+import { rateLimit, getClientKey } from '@/lib/rate-limit'
 
 // POST /api/public/upload?slug=xxx&folder=members
 // Public upload used by the registration page. The slug must be a valid church registration link.
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`public-upload:${getClientKey(request)}`, 5, 60_000)
+  if (!rl.ok) return Response.json({ error: 'Trop de requêtes' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) } })
   try {
     const { searchParams } = new URL(request.url)
     const slug = searchParams.get('slug') || ''
     const folder = searchParams.get('folder') || 'members'
+    if (folder !== 'members') return Response.json({ error: 'Dossier invalide' }, { status: 400 })
 
     if (!slug) {
       return Response.json({ error: 'Lien d\'inscription manquant' }, { status: 400 })
@@ -53,11 +57,11 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Erreur d\'enregistrement de l\'image' }, { status: 500 })
     }
 
-    const { data: publicData } = supabase.storage
+    const { data: signedData, error: signedError } = await supabase.storage
       .from(SUPABASE_BUCKET)
-      .getPublicUrl(path)
-
-    return Response.json({ url: publicData?.publicUrl || null, path }, { status: 201 })
+      .createSignedUrl(path, 3600)
+    if (signedError) return Response.json({ error: 'Erreur de lecture de l’image' }, { status: 500 })
+    return Response.json({ url: signedData.signedUrl, path, expiresIn: 3600 }, { status: 201 })
   } catch (error) {
     console.error('Public upload POST error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

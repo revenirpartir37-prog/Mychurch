@@ -1,16 +1,8 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
-
-async function getAuth(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
 
 const createNotificationSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
@@ -26,7 +18,7 @@ const markReadSchema = z.object({
 // GET: List notifications for current user + unreadCount
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -86,7 +78,7 @@ export async function GET(request: NextRequest) {
 // POST: Create notification
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -123,7 +115,7 @@ export async function POST(request: NextRequest) {
 // PUT: Mark notifications as read
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -154,7 +146,7 @@ export async function PUT(request: NextRequest) {
 // DELETE: Delete notification
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -173,7 +165,7 @@ export async function DELETE(request: NextRequest) {
       return Response.json({ error: 'Notification not found' }, { status: 404 })
     }
 
-    await db.notification.delete({ where: { id } })
+    await db.notification.deleteMany({ where: { id, churchId: auth.churchId, userId: auth.userId } })
 
     return Response.json({ success: true })
   } catch (error) {

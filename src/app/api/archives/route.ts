@@ -230,7 +230,7 @@ export async function DELETE(req: NextRequest) {
     const existing = await db.archive.findFirst({ where: { id, churchId: auth.churchId } })
     if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
-    await db.archive.delete({ where: { id } })
+    await db.archive.deleteMany({ where: { id, churchId: auth.churchId } })
 
     createAuditLog({
       churchId: auth.churchId,

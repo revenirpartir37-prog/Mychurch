@@ -1,16 +1,10 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { notifyChurchUsers, notifyUser } from '@/lib/notification-dispatch'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
-
-async function getAuth(req: NextRequest) {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  return verifyAccessToken(token)
-}
 
 const createUserSchema = z.object({
   firstName: z.string().min(1),
@@ -36,7 +30,7 @@ const updateUserSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth || !auth.churchId || !auth.userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(req.url)
@@ -90,7 +84,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth || !auth.churchId || !auth.userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
 
@@ -178,7 +172,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth || !auth.churchId || !auth.userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
 
@@ -264,7 +258,7 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const auth = await getAuth(req)
+    const auth = await requireAuth(req)
     if (!auth) return Response.json({ error: 'Unauthorized' }, { status: 401 })
     if (auth.role !== 'admin') return Response.json({ error: 'Admin only' }, { status: 403 })
 
@@ -280,7 +274,7 @@ export async function DELETE(req: NextRequest) {
     if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
 
     // Soft delete — deactivate rather than delete to preserve audit trail
-    await db.user.update({ where: { id }, data: { isActive: false } })
+    await db.user.update({ where: { id: existing.id }, data: { isActive: false } })
 
     createAuditLog({
       churchId: auth.churchId,

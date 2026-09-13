@@ -1,4 +1,4 @@
-import { verifyAccessToken } from '@/lib/auth'
+import { requireAuth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { createAuditLog } from '@/lib/audit'
 import { notifyChurchUsers, notifyUser } from '@/lib/notification-dispatch'
@@ -8,14 +8,6 @@ import { NextRequest } from 'next/server'
 const bulkDeleteSchema = z.object({
   ids: z.array(z.string().min(1)).min(1, 'Au moins un ID est requis'),
 })
-
-async function getAuth(request: NextRequest) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return null
-  const payload = await verifyAccessToken(token)
-  if (!payload || !payload.churchId || !payload.userId) return null
-  return payload
-}
 
 const createMemberSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -52,7 +44,7 @@ const updateMemberSchema = z.object({
 // GET: List members with search, filters, pagination
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -114,7 +106,7 @@ export async function GET(request: NextRequest) {
 // POST: Create new member
 export async function POST(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -180,7 +172,7 @@ export async function POST(request: NextRequest) {
 // PUT: Update member
 export async function PUT(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -218,7 +210,7 @@ export async function PUT(request: NextRequest) {
     if (data.status !== undefined) updateData.status = data.status
 
     const member = await db.member.update({
-      where: { id },
+      where: { id: existing.id },
       data: updateData,
     })
 
@@ -261,7 +253,7 @@ export async function PUT(request: NextRequest) {
 // DELETE: Soft delete (single via query param or bulk via JSON body)
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await getAuth(request)
+    const auth = await requireAuth(request)
     if (!auth) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -325,7 +317,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const member = await db.member.update({
-      where: { id },
+      where: { id: existing.id },
       data: { status: 'inactive' },
     })
 
