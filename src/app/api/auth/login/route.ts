@@ -174,14 +174,13 @@ export async function POST(request: NextRequest) {
       subscription,
       subscriptionStatus: isSubscriptionExpired ? 'expired' : 'active',
     })
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return Response.json({ error: 'Données de formulaire invalides', details: error.issues }, { status: 400 })
     }
-    console.error('Login error:', error)
-    // Différencie erreur interne vs identifiants (ne pas masquer 500 en 401)
-    const isDbError = (error as any)?.code?.startsWith('P') || (error as Error).message?.includes('connect')
+    console.error('Login error:', error?.message, error?.code)
+    const isDbError = error?.code?.startsWith('P') || error?.message?.includes('connect')
     if (isDbError) return Response.json({ error: 'Erreur serveur, réessayez' }, { status: 503 })
-    return Response.json({ error: 'Erreur interne' }, { status: 500 })
+    return Response.json({ error: error?.message || 'Erreur interne' }, { status: 500 })
   }
 }
