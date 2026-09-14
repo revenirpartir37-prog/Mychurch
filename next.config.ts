@@ -25,11 +25,18 @@ const nextConfig: NextConfig = {
       },
       {
         // Service worker: never cache (allows update detection)
-        source: "/sw.js",
+        source: "/(sw|register-sw)\\.js",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Pragma", value: "no-cache" },
           { key: "Expires", value: "0" },
+        ],
+      },
+      {
+        // All _next/static assets: no cache (forces fresh JS bundles)
+        source: "/_next/static/(.*)",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         ],
       },
       {
