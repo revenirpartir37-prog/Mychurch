@@ -33,13 +33,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // All _next/static assets: no cache (forces fresh JS bundles)
-        source: "/_next/static/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
-        ],
-      },
-      {
         // API routes: no cache
         source: "/api/(.*)",
         headers: [
