@@ -483,7 +483,7 @@ export function MessagesPage() {
   function ConversationItem({ conv }: { conv: Conversation }) {
     const isActive = selectedConversation?.peerId === conv.peerId
     const peer = conv.peer
-    const initials = `${peer.firstName[0]}${peer.lastName[0]}`
+    const initials = `${(peer.firstName || '?')[0]}${(peer.lastName || '?')[0]}`
     const avatarColor = getAvatarColor(peer.firstName + peer.lastName)
 
     // Truncate last message content

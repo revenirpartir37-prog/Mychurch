@@ -596,7 +596,7 @@ export function MemberCardsPage() {
       )}
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-border gap-2">
+      <div className="flex flex-wrap border-b border-border gap-2">
         <Button
           variant={activeTab === 'generate' ? 'default' : 'ghost'}
           onClick={() => setActiveTab('generate')}

@@ -57,6 +57,17 @@ export function SubscriptionGuard({ children }: { children: React.ReactNode }) {
   }
 
   const isExpired = !!status?.isExpired
+  const isAdmin = auth.role === 'admin'
+
+  // ── L'ADMIN A TOUJOURS ACCÈS À TOUT ──
+  if (isAdmin) {
+    return (
+      <div className="space-y-4">
+        <TabTipBanner />
+        {children}
+      </div>
+    )
+  }
 
   // ── CAS OÙ L'ABONNEMENT / ESSAI EST EXPIRÉ ──
   if (isExpired) {

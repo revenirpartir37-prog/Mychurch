@@ -111,7 +111,7 @@ export function AppHeader({ onToggleSidebar }: AppHeaderProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher..."
-              className="pl-9 pr-8 h-9 w-48 sm:w-64"
+              className="pl-9 pr-8 h-9 w-full sm:w-64 max-w-[200px] sm:max-w-none"
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   setSearchOpen(false)

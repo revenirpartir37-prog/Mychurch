@@ -313,15 +313,15 @@ function SubscriptionTab() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Formule</p>
-                <p className="font-semibold">{planLabel(sub.subscription.plan)}</p>
+                <p className="font-semibold">{planLabel(sub?.subscription?.plan)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Statut</p>
-                <p className="font-semibold capitalize">{sub.subscription.status}</p>
+                <p className="font-semibold capitalize">{sub?.subscription?.status}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Expiration</p>
-                <p className="font-semibold">{endDateFmt(sub.subscription.endDate, sub.subscription.plan)}</p>
+                <p className="font-semibold">{endDateFmt(sub?.subscription?.endDate, sub?.subscription?.plan)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs uppercase font-semibold mb-1">Type</p>
@@ -330,7 +330,7 @@ function SubscriptionTab() {
             </div>
 
             {/* Compte à rebours ou Statut à vie */}
-            {isActive && sub.subscription.plan === 'lifetime' ? (
+            {isActive && sub?.subscription?.plan === 'lifetime' ? (
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-500">
@@ -1248,7 +1248,7 @@ export function SettingsPage() {
               </div>
 
               {/* Audit log table */}
-              <div className="max-h-96 overflow-y-auto rounded-lg border">
+              <div className="max-h-96 overflow-y-auto overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>

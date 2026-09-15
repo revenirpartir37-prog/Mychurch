@@ -397,17 +397,17 @@ export function UsersManagementPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Utilisateur</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Email</TableHead>
                   <TableHead>Rôle</TableHead>
-                  <TableHead>Fonction</TableHead>
+                  <TableHead className="hidden md:table-cell">Fonction</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead>Dernière connexion</TableHead>
+                  <TableHead className="hidden md:table-cell">Dernière connexion</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map(user => {
-                  const initials = `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+                  const initials = `${(user.firstName || '?')[0]}${(user.lastName || '?')[0]}`.toUpperCase()
                   const isSelf = user.id === auth.userId
                   return (
                     <TableRow key={user.id} className={!user.isActive ? 'opacity-60' : ''}>
@@ -427,9 +427,9 @@ export function UsersManagementPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{user.email}</TableCell>
                       <TableCell><RoleBadge role={user.role} /></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{user.function || '—'}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{user.function || '—'}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Switch
@@ -443,7 +443,7 @@ export function UsersManagementPage() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                         {user.lastLogin
                           ? format(new Date(user.lastLogin), 'dd MMM yyyy', { locale: fr })
                           : 'Jamais connecté'}

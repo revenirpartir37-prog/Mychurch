@@ -1,5 +1,5 @@
-const CACHE_NAME = 'mychurch-v6'
-const APP_VERSION = '0.3.1'
+const CACHE_NAME = 'mychurch-v8'
+const APP_VERSION = '0.3.2'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
@@ -29,17 +29,18 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
-  if (request.url.includes('/api/')) return
-  if (request.url.includes('OneSignal') || request.url.includes('onesignal.com')) return
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => new Response('Hors ligne', { status: 503, headers: { 'Content-Type': 'text/plain' } }))
+      fetch(request).catch(() => new Response('Hors ligne', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }))
     )
     return
   }
 
+  if (request.url.includes('/api/')) return
+  if (request.url.includes('OneSignal') || request.url.includes('onesignal.com')) return
+
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    caches.match(request).then(cached => cached || fetch(request))
   )
 })

@@ -292,7 +292,7 @@ function HeatmapView({ weekOffset, onWeekChange }: { weekOffset: number; onWeekC
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onWeekChange(weekOffset - 1)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm font-medium min-w-[160px] text-center">
+              <span className="text-sm font-medium min-w-[120px] sm:min-w-[160px] text-center">
                 {formatWeekRange(weekOffset)}
               </span>
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onWeekChange(weekOffset + 1)} disabled={weekOffset >= 0}>
@@ -902,7 +902,7 @@ export function AttendancePage() {
                       <Button
                         onClick={handleSave}
                         disabled={saving}
-                        className="gap-2 min-w-[180px]"
+                        className="gap-2 min-w-[140px] sm:min-w-[180px]"
                       >
                         {saving ? (
                           <>

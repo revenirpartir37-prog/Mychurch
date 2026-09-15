@@ -8,23 +8,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Static assets: cache for 1 year (immutable)
+        // Logo: immutable cache
         source: "/logo-mychurch.png",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
       {
-        source: "/(.*)",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-        ],
-      },
-      {
-        // Service worker: never cache (allows update detection)
+        // Service worker: never cache
         source: "/(sw|register-sw)\\.js",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
@@ -39,6 +30,23 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
           { key: "Pragma", value: "no-cache" },
           { key: "Expires", value: "0" },
+        ],
+      },
+      {
+        // HTML pages: no cache
+        source: "/:path*",
+        has: [{ type: "header", key: "accept", value: "text/html" }],
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
     ];

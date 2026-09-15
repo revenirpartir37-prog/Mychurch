@@ -304,9 +304,9 @@ export function DebtsPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40">
               <Filter className="h-4 w-4 mr-1 text-muted-foreground" />
               <SelectValue placeholder="Statut" />
             </SelectTrigger>
@@ -364,7 +364,7 @@ export function DebtsPage() {
                   <TableRow key={debt.id}>
                     <TableCell className="font-medium">{debt.creditor}</TableCell>
                     <TableCell className="font-mono font-semibold">
-                      {debt.amount.toLocaleString('fr-FR')} {debt.currency}
+                      {(debt.amount ?? 0).toLocaleString('fr-FR')} {debt.currency}
                     </TableCell>
                     <TableCell className="text-muted-foreground max-w-[200px] truncate">
                       {debt.description || '—'}

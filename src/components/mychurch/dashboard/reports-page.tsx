@@ -786,7 +786,7 @@ export function ReportsPage() {
         </div>
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">Période personnalisée</p>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
             <div className="relative">
               <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <input
@@ -808,7 +808,7 @@ export function ReportsPage() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2 sm:self-end">
+        <div className="flex flex-wrap gap-2 sm:self-end">
           <Button variant="outline" className="gap-1.5" onClick={generatePDF}>
             <Download className="h-4 w-4" />
             Exporter PDF

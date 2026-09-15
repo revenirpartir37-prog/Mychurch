@@ -267,9 +267,9 @@ export function ArchivesPage() {
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex gap-2 flex-1">
+        <div className="flex gap-2 flex-1 flex-wrap">
           <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1) }}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>

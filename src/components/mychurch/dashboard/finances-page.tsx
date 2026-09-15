@@ -378,7 +378,7 @@ export function FinancesPage() {
             t.type === 'revenue'
               ? (REVENUE_LABELS[t.category as RevenueCategory] ?? t.category)
               : (EXPENSE_LABELS[t.category as ExpenseCategory] ?? t.category),
-          amount: t.amount.toFixed(2),
+          amount: (t.amount ?? 0).toFixed(2),
           currency: t.currency,
           location: locationLabel(t.location),
           description: t.description || '',
