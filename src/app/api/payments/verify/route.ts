@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
           },
           data: {
             paymentStatus: 'completed',
+            status: 'active',
           },
         })
 

@@ -51,6 +51,31 @@ export async function GET(request: NextRequest) {
     const isBranch = !!church.parentId
     const isHeadquarters = !isBranch
 
+    // Confirm the most recent renewal before selecting the entitlement. This covers the
+    // browser return from GeniusPay when the webhook has not arrived yet.
+    const pendingSubscription = await db.subscription.findFirst({
+      where: {
+        churchId: auth.churchId,
+        paymentStatus: 'pending',
+        paymentRef: { not: null },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (pendingSubscription?.paymentRef) {
+      try {
+        const paymentResponse = await getPayment(pendingSubscription.paymentRef)
+        if (paymentResponse.success && paymentResponse.data?.status === 'completed') {
+          await db.subscription.update({
+            where: { id: pendingSubscription.id },
+            data: { paymentStatus: 'completed', status: 'active' },
+          })
+        }
+      } catch {
+        // The webhook can still complete activation when GeniusPay is temporarily unavailable.
+      }
+    }
+
     // 1. Chercher prioritairement un abonnement actif (payant, à vie ou essai en cours)
     let subscription = await db.subscription.findFirst({
       where: {
@@ -67,22 +92,6 @@ export async function GET(request: NextRequest) {
         where: { churchId: auth.churchId },
         orderBy: { createdAt: 'desc' },
       })
-    }
-
-    // Vérification automatique de paiement en attente (auto-check sur GeniusPay)
-    if (subscription?.paymentStatus === 'pending' && subscription.paymentRef) {
-      try {
-        const paymentResponse = await getPayment(subscription.paymentRef)
-        if (paymentResponse.success && paymentResponse.data?.status === 'completed') {
-          const updated = await db.subscription.update({
-            where: { id: subscription.id },
-            data: { paymentStatus: 'completed', status: 'active' },
-          })
-          subscription = updated
-        }
-      } catch {
-        // En cas d'erreur de vérification, continuer
-      }
     }
 
     const now = new Date()
@@ -126,6 +135,12 @@ export async function GET(request: NextRequest) {
       const isPast = new Date(subscription.endDate) < now
       isExpired = isPast
       canAccess = !isExpired
+      if (isPast) {
+        subscription = await db.subscription.update({
+          where: { id: subscription.id },
+          data: { status: 'expired' },
+        })
+      }
     } else {
       isExpired = true
       canAccess = false
