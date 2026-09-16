@@ -118,6 +118,8 @@ export function AppSidebar() {
                 if (item.view === 'messages') return canViewMessages(role)
                 if (item.view === 'archives') return canViewArchives(role)
                 if (item.view === 'users-management') return canManageUsers(role)
+                // Hide tabs when subscription expired (admin bypasses)
+                if (isSubscriptionExpired && role !== 'admin' && item.view !== 'dashboard' && item.view !== 'settings' && item.view !== 'about') return false
                 return true
               }).map((item) => {
                 const isActive = currentView === item.view

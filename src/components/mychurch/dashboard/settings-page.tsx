@@ -226,6 +226,7 @@ function SubscriptionTab() {
       const data = await res.json()
       if (res.ok) {
         toast.success(data.message || 'Abonnement à vie activé !')
+        useAppStore.getState().setIsSubscriptionExpired(false)
         setSub((prev) => prev ? {
           ...prev,
           isExpired: false,
