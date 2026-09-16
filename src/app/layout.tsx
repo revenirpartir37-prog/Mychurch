@@ -54,7 +54,7 @@ export default function RootLayout({
     <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/logo-mychurch.png" />
-        <Script src="/register-sw.js" strategy="afterInteractive" />
+        <Script src="/register-sw.js?v=11" strategy="afterInteractive" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
