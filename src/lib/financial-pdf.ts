@@ -93,7 +93,7 @@ export async function generateFinancialPDF(data: FinancialPDFData) {
   // Metadata Table
   startY += 18
   const locationLabel = data.location === 'bank' ? 'Banque' : 'Caisse'
-  const formattedAmount = `${data.amount.toFixed(2)} ${data.currency}`
+  const formattedAmount = `${Number(data.amount ?? 0).toFixed(2)} ${data.currency}`
 
   autoTable(doc, {
     startY,

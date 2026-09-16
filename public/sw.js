@@ -1,16 +1,17 @@
-const CACHE_NAME = 'mychurch-v9'
-const OFFLINE_PAGE = '/manifest.json'
+const CACHE_NAME = 'mychurch-v11'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_PAGE]))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(['/manifest.json', '/logo-mychurch.png']))
   )
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) => Promise.all(names.map((n) => caches.delete(n)))).then(() => self.clients.claim())
+    caches.keys().then((names) => Promise.all(
+      names.map((n) => caches.delete(n))
+    )).then(() => self.clients.claim())
   )
 })
 
@@ -24,18 +25,28 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match(OFFLINE_PAGE).then(r => r || new Response('Hors ligne', { status: 503 })))
+      fetch(request).catch(() => new Response('Hors ligne', { status: 503 }))
     )
     return
   }
 
+  if (request.url.includes('/_next/') || request.url.endsWith('.js') || request.url.endsWith('.css')) {
+    event.respondWith(fetch(request))
+    return
+  }
+
+  if (request.url.includes('/api/') || request.url.includes('OneSignal') || request.url.includes('onesignal.com')) return
+
   event.respondWith(
-    fetch(request).then((response) => {
-      if (response.ok && request.url.includes('/_next/static/')) {
-        const clone = response.clone()
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-      }
-      return response
-    }).catch(() => caches.match(request))
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request).then((response) => {
+        if (response.ok) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+        }
+        return response
+      }).catch(() => cached)
+      return cached || networkFetch
+    })
   )
 })
