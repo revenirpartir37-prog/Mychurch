@@ -330,11 +330,11 @@ export function ReportsPage() {
 
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Total Compte rendus: ${totalRevenue.toFixed(2)} USD`, 15, yPos)
+      doc.text(`Total Compte rendus: ${Number(totalRevenue).toFixed(2)} USD`, 15, yPos)
       yPos += 6
-      doc.text(`Total Dépenses: ${totalExpense.toFixed(2)} USD`, 15, yPos)
+      doc.text(`Total Dépenses: ${Number(totalExpense).toFixed(2)} USD`, 15, yPos)
       yPos += 6
-      doc.text(`Solde net: ${netBalance.toFixed(2)} USD`, 15, yPos)
+      doc.text(`Solde net: ${Number(netBalance).toFixed(2)} USD`, 15, yPos)
       yPos += 10
 
       // Category breakdown table
@@ -344,9 +344,9 @@ export function ReportsPage() {
           head: [['Catégorie', 'Compte rendus (USD)', 'Dépenses (USD)', 'Solde (USD)']],
           body: categoryBreakdown.map((c) => [
             REVENUE_LABELS[c.category as keyof typeof REVENUE_LABELS] || EXPENSE_LABELS[c.category as keyof typeof EXPENSE_LABELS] || c.category,
-            c.revenue.toFixed(2),
-            c.expense.toFixed(2),
-            (c.revenue - c.expense).toFixed(2),
+            Number(c.revenue).toFixed(2),
+            Number(c.expense).toFixed(2),
+            Number(c.revenue - c.expense).toFixed(2),
           ]),
           styles: { fontSize: 9, cellPadding: 3 },
           headStyles: { fillColor: [99, 102, 241] },
@@ -413,7 +413,7 @@ export function ReportsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Compte rendus</p>
                   <p className="text-xl font-bold text-emerald-500 tabular-nums">
-                    {animRev.toFixed(2)} USD
+                    {Number(animRev).toFixed(2)} USD
                   </p>
                 </div>
               </div>
@@ -429,7 +429,7 @@ export function ReportsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Dépenses</p>
                   <p className="text-xl font-bold text-rose-500 tabular-nums">
-                    {animExp.toFixed(2)} USD
+                    {Number(animExp).toFixed(2)} USD
                   </p>
                 </div>
               </div>
@@ -445,7 +445,7 @@ export function ReportsPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Solde net</p>
                   <p className={`text-xl font-bold tabular-nums ${netBalance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {netBalance >= 0 ? '' : '-'}{animBal.toFixed(2)} USD
+                    {netBalance >= 0 ? '' : '-'}{Number(animBal).toFixed(2)} USD
                   </p>
                 </div>
               </div>
@@ -475,7 +475,7 @@ export function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="name" className="text-xs" />
                     <YAxis className="text-xs" />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${value.toFixed(2)} USD`, '']} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${Number(value).toFixed(2)} USD`, '']} />
                     <Legend />
                     <Bar dataKey="Compte rendus" fill="#10b981" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -506,7 +506,7 @@ export function ReportsPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="name" className="text-xs" />
                     <YAxis className="text-xs" />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${value.toFixed(2)} USD`, '']} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${Number(value).toFixed(2)} USD`, '']} />
                     <Legend />
                     <Line
                       type="monotone"
@@ -557,13 +557,13 @@ export function ReportsPage() {
                         <TableRow key={row.category}>
                           <TableCell className="font-medium">{label}</TableCell>
                           <TableCell className="text-right text-emerald-500">
-                            {row.revenue > 0 ? row.revenue.toFixed(2) : '—'}
+                            {row.revenue > 0 ? Number(row.revenue).toFixed(2) : '—'}
                           </TableCell>
                           <TableCell className="text-right text-red-500">
-                            {row.expense > 0 ? row.expense.toFixed(2) : '—'}
+                            {row.expense > 0 ? Number(row.expense).toFixed(2) : '—'}
                           </TableCell>
                           <TableCell className={`text-right font-semibold ${net >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                            {net.toFixed(2)}
+                            {Number(net).toFixed(2)}
                           </TableCell>
                         </TableRow>
                       )
@@ -653,7 +653,7 @@ export function ReportsPage() {
                         outerRadius={90}
                         paddingAngle={4}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => `${name} ${Number(percent * 100).toFixed(0)}%`}
                       >
                         {memberPieData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />

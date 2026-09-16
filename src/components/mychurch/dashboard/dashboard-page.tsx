@@ -630,7 +630,7 @@ export function DashboardPage() {
                     <div className="space-y-1 flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-lg text-amber-600 dark:text-amber-400">
-                          {(debt.amount ?? 0).toFixed(2)} {debt.currency}
+                          {Number(debt.amount ?? 0).toFixed(2)} {debt.currency}
                         </span>
                         <Badge variant="outline" className="text-xs bg-amber-100/35 border-amber-300/40 text-amber-800 dark:text-amber-300">
                           Créancier: {debt.creditor}
@@ -925,7 +925,7 @@ export function DashboardPage() {
                       </div>
                     </div>
                     <p className={`font-semibold shrink-0 ml-2 ${t.type === 'revenue' ? 'text-emerald-500' : 'text-red-500'}`}>
-                      {t.type === 'revenue' ? '+' : '-'}{(t.amount ?? 0).toFixed(2)} {t.currency}
+                      {t.type === 'revenue' ? '+' : '-'}{Number(t.amount ?? 0).toFixed(2)} {t.currency}
                     </p>
                   </div>
                 ))}

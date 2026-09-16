@@ -992,7 +992,7 @@ export function MembersPage() {
                 <div className="text-center">
                   <p className="text-sm font-medium text-green-700 dark:text-green-400">{importFile.name}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {(importFile.size / 1024).toFixed(1)} Ko — Cliquez pour changer
+                    {Number(importFile.size / 1024).toFixed(1)} Ko — Cliquez pour changer
                   </p>
                 </div>
               ) : (

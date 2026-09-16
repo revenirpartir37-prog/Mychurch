@@ -378,7 +378,7 @@ export function FinancesPage() {
             t.type === 'revenue'
               ? (REVENUE_LABELS[t.category as RevenueCategory] ?? t.category)
               : (EXPENSE_LABELS[t.category as ExpenseCategory] ?? t.category),
-          amount: (t.amount ?? 0).toFixed(2),
+          amount: Number(t.amount ?? 0).toFixed(2),
           currency: t.currency,
           location: locationLabel(t.location),
           description: t.description || '',
@@ -682,7 +682,7 @@ export function FinancesPage() {
                               <span className="text-sm font-medium tabular-nums">{entry.value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</span>
                               <span className="text-xs text-muted-foreground w-10 text-right">
                                 {totalRevenuePie > 0
-                                  ? ((entry.value / totalRevenuePie) * 100).toFixed(0)
+                                  ? Number((entry.value / totalRevenuePie) * 100).toFixed(0)
                                   : 0}%
                               </span>
                             </div>
@@ -942,7 +942,7 @@ export function FinancesPage() {
                       <span className="text-sm font-medium tabular-nums">{entry.value.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {activeChartSymbol}</span>
                       <span className="text-xs text-muted-foreground w-12 text-right">
                         {totalExpensesPie > 0
-                          ? ((entry.value / totalExpensesPie) * 100).toFixed(0)
+                          ? Number((entry.value / totalExpensesPie) * 100).toFixed(0)
                           : 0}%
                       </span>
                     </div>

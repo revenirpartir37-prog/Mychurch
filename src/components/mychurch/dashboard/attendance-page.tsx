@@ -213,7 +213,7 @@ function WeeklyStatsCard({ data }: { data: HeatmapData | null }) {
               <p className="text-xs text-muted-foreground">Meilleur jour</p>
               <p className="text-sm font-semibold capitalize">{bestDay?.dayName}</p>
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                {bestDay?.rate.toFixed(0)}% de présence
+                {Number(bestDay?.rate ?? 0).toFixed(0)}% de présence
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ function WeeklyStatsCard({ data }: { data: HeatmapData | null }) {
               <p className="text-xs text-muted-foreground">Jour le plus faible</p>
               <p className="text-sm font-semibold capitalize">{worstDay?.dayName}</p>
               <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                {worstDay?.rate.toFixed(0)}% de présence
+                {Number(worstDay?.rate ?? 0).toFixed(0)}% de présence
               </p>
             </div>
           </div>
