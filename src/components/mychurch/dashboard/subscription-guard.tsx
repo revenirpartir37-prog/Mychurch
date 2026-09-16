@@ -13,6 +13,7 @@ interface SubscriptionStatus {
   isHeadquarters: boolean
   isExpired: boolean
   canAccess: boolean
+  isPending: boolean
   churchName: string
   parentName?: string
   subscription: {

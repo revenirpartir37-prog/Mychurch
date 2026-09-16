@@ -97,6 +97,7 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     let isExpired = false
     let canAccess = true
+    let isPending = false
 
     if (!subscription) {
       // Première visite sans abonnement : octroi automatique de 7 jours d'essai gratuit
@@ -131,19 +132,36 @@ export async function GET(request: NextRequest) {
     if (subscription.plan === 'lifetime') {
       isExpired = false
       canAccess = true
-    } else if (subscription.status === 'active' && subscription.paymentStatus === 'completed') {
-      const isPast = new Date(subscription.endDate) < now
-      isExpired = isPast
-      canAccess = !isExpired
-      if (isPast) {
-        subscription = await db.subscription.update({
-          where: { id: subscription.id },
-          data: { status: 'expired' },
-        })
-      }
     } else {
-      isExpired = true
-      canAccess = false
+      const isPast = new Date(subscription.endDate) < now
+      const isPaid = subscription.paymentStatus === 'completed'
+
+      if (isPast) {
+        // endDate dépassé → expiré
+        isExpired = true
+        canAccess = false
+        if (subscription.status !== 'expired') {
+          subscription = await db.subscription.update({
+            where: { id: subscription.id },
+            data: { status: 'expired' },
+          })
+        }
+      } else if (isPaid) {
+        // endDate dans le futur + payé → actif
+        isExpired = false
+        canAccess = true
+        if (subscription.status !== 'active') {
+          subscription = await db.subscription.update({
+            where: { id: subscription.id },
+            data: { status: 'active' },
+          })
+        }
+      } else {
+        // endDate dans le futur mais pas encore payé (pending) → accès en attente de confirmation
+        isExpired = false
+        canAccess = true
+        isPending = true
+      }
     }
 
     return Response.json({
@@ -152,6 +170,7 @@ export async function GET(request: NextRequest) {
       isHeadquarters,
       isExpired,
       canAccess,
+      isPending,
       churchName: church.name,
       parentName: church.parent?.name,
     })

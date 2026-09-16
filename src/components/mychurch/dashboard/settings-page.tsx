@@ -122,6 +122,7 @@ interface SubStatus {
   isHeadquarters: boolean
   isExpired: boolean
   canAccess: boolean
+  isPending: boolean
   churchName: string
   parentName?: string
   subscription: {
@@ -265,8 +266,9 @@ function SubscriptionTab() {
     </div>
   )
 
-  const isActive = sub?.subscription && !sub.isExpired
+  const isActive = sub?.subscription && !sub.isExpired && !sub.isPending
   const isExpired = sub?.isExpired
+  const isPending = sub?.isPending
 
   return (
     <div className="space-y-6">
@@ -284,7 +286,7 @@ function SubscriptionTab() {
 
       {/* ── Statut actuel ── */}
       <Card className="overflow-hidden">
-        <div className={`px-6 py-5 text-white ${isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : isExpired ? 'bg-gradient-to-r from-red-600 to-rose-700' : 'bg-gradient-to-r from-slate-600 to-slate-700'}`}>
+        <div className={`px-6 py-5 text-white ${isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-600' : isPending ? 'bg-gradient-to-r from-amber-500 to-orange-600' : isExpired ? 'bg-gradient-to-r from-red-600 to-rose-700' : 'bg-gradient-to-r from-slate-600 to-slate-700'}`}>
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm shrink-0">
@@ -292,11 +294,13 @@ function SubscriptionTab() {
               </div>
               <div>
                 <h2 className="text-xl font-bold">
-                  {isActive ? planLabel(sub?.subscription?.plan) : isExpired ? 'Abonnement Expiré' : 'Aucun Abonnement Actif'}
+                  {isActive ? planLabel(sub?.subscription?.plan) : isPending ? 'Paiement en attente' : isExpired ? 'Abonnement Expiré' : 'Aucun Abonnement Actif'}
                 </h2>
                 <p className="text-sm text-white/80">
                   {isActive
                     ? `Actif jusqu'au ${endDateFmt(sub?.subscription?.endDate)}`
+                    : isPending
+                    ? `Confirmation du paiement en cours — expire le ${endDateFmt(sub?.subscription?.endDate)}`
                     : isExpired
                     ? `Expiré le ${endDateFmt(sub?.subscription?.endDate)}`
                     : 'Souscrivez pour débloquer toutes les fonctionnalités'}
@@ -304,7 +308,7 @@ function SubscriptionTab() {
               </div>
             </div>
             <Badge className={`shrink-0 font-bold ${isActive ? 'bg-white/20 text-white border-0' : 'bg-white/20 text-white border-0'}`}>
-              {isActive ? '✅ Actif' : isExpired ? '❌ Expiré' : '⏳ Inactif'}
+              {isActive ? '✅ Actif' : isPending ? '⏳ En attente' : isExpired ? '❌ Expiré' : '⏳ Inactif'}
             </Badge>
           </div>
         </div>
