@@ -121,7 +121,7 @@ export function AppSidebar() {
                 return true
               }).map((item) => {
                 const isActive = currentView === item.view
-                const isRestrictedBySub = isSubscriptionExpired && auth.role !== 'admin' && item.view !== 'dashboard' && item.view !== 'settings' && item.view !== 'about'
+                const isRestrictedBySub = false
 
                 const FinanceIcon = (auth.currencySymbol === 'FC' || auth.churchCurrency === 'CDF')
                   ? Banknote

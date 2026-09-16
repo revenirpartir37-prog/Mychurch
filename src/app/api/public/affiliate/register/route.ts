@@ -74,12 +74,6 @@ export async function POST(request: NextRequest) {
     }
 
     const parentSub = parentChurch.subscriptions[0]
-    const isParentActive = parentSub && parentSub.plan !== 'trial' && new Date(parentSub.endDate) > new Date()
-    if (!isParentActive) {
-      return Response.json({
-        error: 'Le Siège de votre réseau doit avoir un abonnement actif pour enregistrer de nouvelles églises affiliées.',
-      }, { status: 403 })
-    }
 
     // Vérifier si l'email de l'église existe déjà
     const existingChurchEmail = await db.church.findUnique({

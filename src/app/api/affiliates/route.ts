@@ -156,14 +156,6 @@ export async function POST(request: NextRequest) {
     }
 
     const currentSub = church.subscriptions[0]
-    const isExpired =
-      !currentSub ||
-      (currentSub.plan !== 'lifetime' && (currentSub.plan === 'trial' || new Date(currentSub.endDate) < new Date()))
-    if (isExpired) {
-      return Response.json({
-        error: 'Le système d\'affiliation n\'est pas disponible. Vous devez souscrire à un abonnement Siège actif.',
-      }, { status: 403 })
-    }
 
     const newCode = generateAffiliationCode()
     const updated = await db.church.update({
