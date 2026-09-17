@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { generateAccessToken, generateRefreshToken } from '@/lib/auth'
+import { getChurchSubscriptionStatus } from '@/lib/subscription'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -59,16 +60,9 @@ export async function POST(request: NextRequest) {
     })
 
     // Check subscription status
-    const subscription = await db.subscription.findFirst({
-      where: {
-        churchId: church.id,
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    const isSubscriptionExpired = !subscription ||
-      subscription.status !== 'active' ||
-      subscription.endDate < new Date()
+    const subStatus = await getChurchSubscriptionStatus(church.id, { autoCreateTrial: true })
+    const subscription = subStatus.subscription
+    const isSubscriptionExpired = subStatus.isExpired
 
     // Generate JWT tokens
     const payload = {

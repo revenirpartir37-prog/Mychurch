@@ -119,7 +119,7 @@ export function AppSidebar() {
                 if (item.view === 'archives') return canViewArchives(role)
                 if (item.view === 'users-management') return canManageUsers(role)
                 // Expired accounts retain only the views needed to renew their subscription.
-                if (isSubscriptionExpired && auth.role !== 'admin' && item.view !== 'dashboard' && item.view !== 'settings') return false
+                if (isSubscriptionExpired && item.view !== 'dashboard' && item.view !== 'settings') return false
                 return true
               }).map((item) => {
                 const isActive = currentView === item.view

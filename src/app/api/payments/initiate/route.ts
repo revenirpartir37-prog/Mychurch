@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createPayment, usdToXof } from '@/lib/geniuspay'
+import { getChurchSubscriptionStatus, calculateSubscriptionEndDate } from '@/lib/subscription'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -85,28 +86,19 @@ export async function POST(request: NextRequest) {
 
     // Save payment reference to the appropriate record
     if (data.paymentType === 'subscription' && data.plan) {
-      // Deactivate old active subscriptions and create a pending one
-      await db.subscription.updateMany({
-        where: {
-          churchId: payload.churchId,
-          status: 'active',
-        },
-        data: { status: 'expired' },
-      })
+      const currentSubStatus = await getChurchSubscriptionStatus(payload.churchId, { autoCreateTrial: false })
+      const existingActiveEndDate = (!currentSubStatus.isExpired && currentSubStatus.subscription?.endDate)
+        ? currentSubStatus.subscription.endDate
+        : null
 
       const startDate = new Date()
-      const endDate = new Date()
-      if (data.plan === 'annual') {
-        endDate.setFullYear(endDate.getFullYear() + 1)
-      } else {
-        endDate.setMonth(endDate.getMonth() + 1)
-      }
+      const endDate = calculateSubscriptionEndDate(data.plan, existingActiveEndDate)
 
       await db.subscription.create({
         data: {
           churchId: payload.churchId,
           plan: data.plan,
-          status: 'active',
+          status: 'pending',
           startDate,
           endDate,
           amount: finalAmount,

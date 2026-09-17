@@ -267,7 +267,9 @@ export function FinancesPage() {
       months.push({ key, label, "Compte rendus": 0, Dépenses: 0 })
     }
     chartTransactions.forEach((t) => {
+      if (!t.date) return
       const tDate = new Date(t.date)
+      if (isNaN(tDate.getTime())) return
       const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, '0')}`
       const month = months.find((m) => m.key === tKey)
       if (month) {
@@ -372,7 +374,7 @@ export function FinancesPage() {
       const today = new Date().toISOString().slice(0, 10)
       downloadCSV(
         all.map((t) => ({
-          date: new Date(t.date).toLocaleDateString('fr-FR'),
+          date: t.date && !isNaN(new Date(t.date).getTime()) ? new Date(t.date).toLocaleDateString('fr-FR') : '—',
           type: t.type === 'revenue' ? 'Compte rendu' : 'Dépense',
           category:
             t.type === 'revenue'
@@ -1022,7 +1024,7 @@ export function FinancesPage() {
                   filteredTransactions.map((t) => (
                     <TableRow key={t.id} className="hover:scale-[1.02] transition-transform duration-200">
                       <TableCell className="text-sm">
-                        {new Date(t.date).toLocaleDateString('fr-FR')}
+                        {t.date && !isNaN(new Date(t.date).getTime()) ? new Date(t.date).toLocaleDateString('fr-FR') : '—'}
                       </TableCell>
                       <TableCell>
                         <Badge variant={t.type === 'revenue' ? 'default' : 'destructive'}>

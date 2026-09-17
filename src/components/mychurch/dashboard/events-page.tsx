@@ -184,7 +184,10 @@ const WEEK_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const WEEK_DAYS_FULL = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
 function formatFrenchDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('fr-FR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -195,12 +198,14 @@ function formatFrenchDate(dateStr: string): string {
 }
 
 function formatDateRange(start: string, end: string | null): string {
+  if (!start) return '—'
   const formatted = formatFrenchDate(start)
   if (!end) return formatted
   const startDate = new Date(start)
   const endDate = new Date(end)
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return formatted
   if (startDate.toDateString() === endDate.toDateString()) {
-    return `${formatFrenchDate(start)} — ${new Date(end).toLocaleTimeString('fr-FR', {
+    return `${formatted} — ${endDate.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
       minute: '2-digit',
     })}`

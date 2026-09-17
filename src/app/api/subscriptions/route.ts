@@ -1,6 +1,7 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { createPayment, getPayment, usdToXof } from '@/lib/geniuspay'
+import { getChurchSubscriptionStatus, calculateSubscriptionEndDate } from '@/lib/subscription'
 import { z } from 'zod'
 import { NextRequest } from 'next/server'
 
@@ -51,126 +52,16 @@ export async function GET(request: NextRequest) {
     const isBranch = !!church.parentId
     const isHeadquarters = !isBranch
 
-    // Confirm the most recent renewal before selecting the entitlement. This covers the
-    // browser return from GeniusPay when the webhook has not arrived yet.
-    const pendingSubscription = await db.subscription.findFirst({
-      where: {
-        churchId: auth.churchId,
-        paymentStatus: 'pending',
-        paymentRef: { not: null },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    if (pendingSubscription?.paymentRef) {
-      try {
-        const paymentResponse = await getPayment(pendingSubscription.paymentRef)
-        if (paymentResponse.success && paymentResponse.data?.status === 'completed') {
-          await db.subscription.update({
-            where: { id: pendingSubscription.id },
-            data: { paymentStatus: 'completed', status: 'active' },
-          })
-        }
-      } catch {
-        // The webhook can still complete activation when GeniusPay is temporarily unavailable.
-      }
-    }
-
-    // 1. Chercher prioritairement un abonnement actif (payant, à vie ou essai en cours)
-    let subscription = await db.subscription.findFirst({
-      where: {
-        churchId: auth.churchId,
-        status: 'active',
-        paymentStatus: 'completed',
-      },
-      orderBy: { createdAt: 'desc' },
-    })
-
-    // 2. Si aucun actif, vérifier s'il y a un abonnement récent (en attente ou expiré)
-    if (!subscription) {
-      subscription = await db.subscription.findFirst({
-        where: { churchId: auth.churchId },
-        orderBy: { createdAt: 'desc' },
-      })
-    }
-
-    const now = new Date()
-    let isExpired = false
-    let canAccess = true
-    let isPending = false
-
-    if (!subscription) {
-      // Première visite sans abonnement : octroi automatique de 7 jours d'essai gratuit
-      const trialEndDate = new Date()
-      trialEndDate.setDate(trialEndDate.getDate() + 7)
-
-      const trialSub = await db.subscription.create({
-        data: {
-          churchId: auth.churchId,
-          plan: 'trial',
-          status: 'active',
-          startDate: new Date(),
-          endDate: trialEndDate,
-          amount: 0,
-          currency: 'USD',
-          paymentStatus: 'completed',
-          paymentRef: `TRIAL-AUTO-${Date.now()}`,
-        },
-      })
-
-      return Response.json({
-        subscription: trialSub,
-        isBranch,
-        isHeadquarters,
-        isExpired: false,
-        canAccess: true,
-        churchName: church.name,
-        parentName: church.parent?.name,
-      })
-    }
-
-    if (subscription.plan === 'lifetime') {
-      isExpired = false
-      canAccess = true
-    } else {
-      const isPast = new Date(subscription.endDate) < now
-      const isPaid = subscription.paymentStatus === 'completed'
-
-      if (isPast) {
-        // endDate dépassé → expiré
-        isExpired = true
-        canAccess = false
-        if (subscription.status !== 'expired') {
-          subscription = await db.subscription.update({
-            where: { id: subscription.id },
-            data: { status: 'expired' },
-          })
-        }
-      } else if (isPaid) {
-        // endDate dans le futur + payé → actif
-        isExpired = false
-        canAccess = true
-        if (subscription.status !== 'active') {
-          subscription = await db.subscription.update({
-            where: { id: subscription.id },
-            data: { status: 'active' },
-          })
-        }
-      } else {
-        // endDate dans le futur mais pas encore payé (pending) → accès en attente de confirmation
-        isExpired = false
-        canAccess = true
-        isPending = true
-      }
-    }
+    const subStatus = await getChurchSubscriptionStatus(auth.churchId, { autoCreateTrial: true })
 
     return Response.json({
-      subscription,
+      subscription: subStatus.subscription,
       isBranch,
       isHeadquarters,
-      isExpired,
-      canAccess,
-      isPending,
+      isExpired: subStatus.isExpired,
+      canAccess: subStatus.canAccess,
+      isPending: subStatus.isPending,
+      isLifetime: subStatus.isLifetime,
       churchName: church.name,
       parentName: church.parent?.name,
     })
@@ -222,13 +113,13 @@ export async function POST(request: NextRequest) {
     const paymentAmount = usdToXof(usdAmount)
     const paymentCurrency = 'XOF'
 
+    const currentSubStatus = await getChurchSubscriptionStatus(targetChurchId, { autoCreateTrial: false })
+    const existingActiveEndDate = (!currentSubStatus.isExpired && currentSubStatus.subscription?.endDate)
+      ? currentSubStatus.subscription.endDate
+      : null
+
     const startDate = new Date()
-    const endDate = new Date()
-    if (data.plan === 'monthly') {
-      endDate.setMonth(endDate.getMonth() + 1)
-    } else {
-      endDate.setFullYear(endDate.getFullYear() + 1)
-    }
+    const endDate = calculateSubscriptionEndDate(data.plan, existingActiveEndDate)
 
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || ''
     const paymentParams: any = {

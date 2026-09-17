@@ -182,8 +182,8 @@ function WeeklyStatsCard({ data }: { data: HeatmapData | null }) {
     const lateCount = statuses.filter(s => s === 'late').length
     const totalWithData = statuses.filter(s => s !== null).length
     const rate = totalWithData > 0 ? ((presentCount + lateCount) / totalWithData) * 100 : 0
-    const d = new Date(dateStr + 'T00:00:00')
-    const dayName = d.toLocaleDateString('fr-FR', { weekday: 'long' })
+    const d = new Date(dateStr ? (dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00') : '')
+    const dayName = isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('fr-FR', { weekday: 'long' })
     return { date: dateStr, dayName, rate, presentCount, lateCount, totalWithData }
   })
 
@@ -665,7 +665,7 @@ export function AttendancePage() {
                     <SelectItem key={ev.id} value={ev.id}>
                       {ev.title}{' '}
                       <span className="text-muted-foreground text-xs">
-                        ({new Date(ev.startDate).toLocaleDateString('fr-FR')})
+                        ({ev.startDate && !isNaN(new Date(ev.startDate).getTime()) ? new Date(ev.startDate).toLocaleDateString('fr-FR') : '—'})
                       </span>
                     </SelectItem>
                   ))}

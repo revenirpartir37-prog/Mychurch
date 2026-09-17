@@ -133,7 +133,7 @@ interface SubStatus {
   } | null
 }
 
-function useSubscriptionCountdown(endDateStr?: string) {
+function useSubscriptionCountdown(endDateStr?: string, isLifetime?: boolean) {
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -143,10 +143,18 @@ function useSubscriptionCountdown(endDateStr?: string) {
   })
 
   useEffect(() => {
-    if (!endDateStr) return
+    if (!endDateStr || isLifetime) {
+      setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: false })
+      return
+    }
 
     const updateCountdown = () => {
       const end = new Date(endDateStr).getTime()
+      if (isNaN(end)) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: false })
+        return
+      }
+
       const now = new Date().getTime()
       const diff = end - now
 
@@ -166,7 +174,7 @@ function useSubscriptionCountdown(endDateStr?: string) {
     updateCountdown()
     const interval = setInterval(updateCountdown, 1000)
     return () => clearInterval(interval)
-  }, [endDateStr])
+  }, [endDateStr, isLifetime])
 
   return timeLeft
 }
@@ -192,7 +200,8 @@ function SubscriptionTab() {
       .finally(() => setLoading(false))
   }, [])
 
-  const countdown = useSubscriptionCountdown(sub?.subscription?.endDate)
+  const isLifetime = sub?.subscription?.plan === 'lifetime'
+  const countdown = useSubscriptionCountdown(sub?.subscription?.endDate, isLifetime)
 
   const [adminCode, setAdminCode] = useState('')
   const [redeeming, setRedeeming] = useState(false)
@@ -255,9 +264,12 @@ function SubscriptionTab() {
     return plan
   }
 
-  const endDateFmt = (d?: string, plan?: string) => {
+  const endDateFmt = (d?: string | null, plan?: string) => {
     if (plan === 'lifetime') return 'À vie (Illimité)'
-    return d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
+    if (!d) return '—'
+    const parsed = new Date(d)
+    if (isNaN(parsed.getTime())) return '—'
+    return parsed.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
   }
 
   if (loading) return (
@@ -298,11 +310,11 @@ function SubscriptionTab() {
                 </h2>
                 <p className="text-sm text-white/80">
                   {isActive
-                    ? `Actif jusqu'au ${endDateFmt(sub?.subscription?.endDate)}`
+                    ? (isLifetime ? 'Accès illimité permanent' : `Actif jusqu'au ${endDateFmt(sub?.subscription?.endDate, sub?.subscription?.plan)}`)
                     : isPending
-                    ? `Confirmation du paiement en cours — expire le ${endDateFmt(sub?.subscription?.endDate)}`
+                    ? `Confirmation du paiement en cours — expire le ${endDateFmt(sub?.subscription?.endDate, sub?.subscription?.plan)}`
                     : isExpired
-                    ? `Expiré le ${endDateFmt(sub?.subscription?.endDate)}`
+                    ? `Expiré le ${endDateFmt(sub?.subscription?.endDate, sub?.subscription?.plan)}`
                     : 'Souscrivez pour débloquer toutes les fonctionnalités'}
                 </p>
               </div>

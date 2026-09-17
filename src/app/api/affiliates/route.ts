@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getChurchSubscriptionStatus } from '@/lib/subscription'
 import { NextRequest } from 'next/server'
 import { randomBytes } from 'crypto'
 
@@ -91,10 +92,14 @@ export async function GET(request: NextRequest) {
     const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get('origin') || 'https://mychurch-taupe.vercel.app'
     const affiliationUrl = `${origin}/affiliate/${church.affiliationCode}`
 
+    const hqStatus = await getChurchSubscriptionStatus(church.id, { autoCreateTrial: true })
+    const isHeadquartersExpired =
+      hqStatus.isExpired || (!hqStatus.isLifetime && hqStatus.subscription?.plan === 'trial')
+
     const now = new Date()
     const mappedBranches = branches.map((b) => {
       const sub = b.subscriptions[0] || null
-      const isExpired = !sub || sub.status !== 'active' || new Date(sub.endDate) < now
+      const isExpired = !sub || (sub.plan !== 'lifetime' && (sub.status !== 'active' || new Date(sub.endDate) < now))
       return {
         id: b.id,
         name: b.name,
@@ -111,12 +116,6 @@ export async function GET(request: NextRequest) {
         isExpired,
       }
     })
-
-    const currentSub = church.subscriptions[0] || null
-    const isHeadquartersExpired =
-      !currentSub ||
-      currentSub.status !== 'active' ||
-      (currentSub.plan !== 'lifetime' && (currentSub.plan === 'trial' || new Date(currentSub.endDate) < now))
 
     return Response.json({
       isBranch: false,
