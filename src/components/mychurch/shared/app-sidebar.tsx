@@ -5,6 +5,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
@@ -40,6 +41,7 @@ import type { AppView, UserRole } from '@/lib/constants'
 import { canViewFinances, canViewMessages, canViewArchives, canManageUsers } from '@/lib/frontend-rbac'
 import Image from 'next/image'
 import { PwaInstallButton } from './pwa-install-button'
+import { useState } from 'react'
 
 interface NavItem {
   label: string
@@ -48,26 +50,55 @@ interface NavItem {
   showBadge?: boolean
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Tableau de bord', icon: LayoutDashboard, view: 'dashboard' },
-  { label: 'Mon Réseau', icon: Network, view: 'network' },
-  { label: 'Membres', icon: Users, view: 'members' },
-  { label: 'Cartes Membres', icon: CreditCard, view: 'member-cards' },
-  { label: 'Finances', icon: DollarSign, view: 'finances' },
-  { label: 'Dettes', icon: Landmark, view: 'debts' },
-  { label: 'Événements', icon: Calendar, view: 'events' },
-  { label: 'Présences', icon: ClipboardCheck, view: 'attendance' },
-  { label: 'Messages', icon: Mail, view: 'messages' },
-  { label: 'Notifications', icon: Bell, view: 'notifications', showBadge: true },
-  { label: 'Rapports', icon: BarChart3, view: 'reports' },
-  { label: 'Archives', icon: FolderArchive, view: 'archives' },
-  { label: 'Utilisateurs', icon: UserCog, view: 'users-management' },
-  { label: 'Paramètres', icon: Settings, view: 'settings' },
-  { label: 'À propos', icon: Info, view: 'about' },
+interface NavSection {
+  label: string
+  items: NavItem[]
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: 'Vue d’ensemble',
+    items: [
+      { label: 'Tableau de bord', icon: LayoutDashboard, view: 'dashboard' },
+      { label: 'Notifications', icon: Bell, view: 'notifications', showBadge: true },
+    ],
+  },
+  {
+    label: 'Vie de l’église',
+    items: [
+      { label: 'Membres', icon: Users, view: 'members' },
+      { label: 'Cartes Membres', icon: CreditCard, view: 'member-cards' },
+      { label: 'Événements', icon: Calendar, view: 'events' },
+      { label: 'Présences', icon: ClipboardCheck, view: 'attendance' },
+      { label: 'Messages', icon: Mail, view: 'messages' },
+    ],
+  },
+  {
+    label: 'Finances',
+    items: [
+      { label: 'Finances', icon: DollarSign, view: 'finances' },
+      { label: 'Dettes', icon: Landmark, view: 'debts' },
+      { label: 'Rapports', icon: BarChart3, view: 'reports' },
+    ],
+  },
+  {
+    label: 'Administration',
+    items: [
+      { label: 'Mon Réseau', icon: Network, view: 'network' },
+      { label: 'Utilisateurs', icon: UserCog, view: 'users-management' },
+      { label: 'Archives', icon: FolderArchive, view: 'archives' },
+      { label: 'Paramètres', icon: Settings, view: 'settings' },
+    ],
+  },
+  {
+    label: 'Aide',
+    items: [{ label: 'À propos', icon: Info, view: 'about' }],
+  },
 ]
 
 export function AppSidebar() {
   const { currentView, setCurrentView, auth, unreadCount, isSubscriptionExpired } = useAppStore()
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
 
   const fullName = auth.firstName && auth.lastName
     ? `${auth.firstName} ${auth.lastName}`
@@ -108,10 +139,8 @@ export function AppSidebar() {
 
       {/* Navigation menu */}
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.filter((item) => {
+        {NAV_SECTIONS.map((section) => {
+          const visibleItems = section.items.filter((item) => {
                 const role = auth.role as UserRole
                 if (item.view === 'network') return role === 'admin'
                 if (item.view === 'finances') return canViewFinances(role)
@@ -121,7 +150,27 @@ export function AppSidebar() {
                 // Expired accounts retain only the views needed to renew their subscription.
                 if (isSubscriptionExpired && item.view !== 'dashboard' && item.view !== 'settings') return false
                 return true
-              }).map((item) => {
+          })
+          if (!visibleItems.length) return null
+          const isCollapsed = collapsedSections[section.label]
+          return (
+            <SidebarGroup key={section.label} className="py-1">
+              <SidebarGroupLabel
+                asChild
+                className="h-7 cursor-pointer select-none px-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              >
+                <button
+                  type="button"
+                  onClick={() => setCollapsedSections((current) => ({ ...current, [section.label]: !current[section.label] }))}
+                  aria-expanded={!isCollapsed}
+                >
+                  <span className="group-data-[collapsible=icon]:hidden">{section.label}</span>
+                  <span className="ml-auto text-xs group-data-[collapsible=icon]:hidden">{isCollapsed ? '+' : '−'}</span>
+                </button>
+              </SidebarGroupLabel>
+              <SidebarGroupContent className={isCollapsed ? 'hidden' : undefined}>
+                <SidebarMenu>
+                  {visibleItems.map((item) => {
                 const isActive = currentView === item.view
                 const isRestrictedBySub = false
 
@@ -165,10 +214,12 @@ export function AppSidebar() {
                     </div>
                   </SidebarMenuItem>
                 )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        })}
       </SidebarContent>
 
       {/* Footer with creator credit */}
