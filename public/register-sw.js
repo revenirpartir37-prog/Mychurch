@@ -2,7 +2,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const registrations = await navigator.serviceWorker.getRegistrations()
-      for (const reg of.active) {
+      for (const reg of registrations) {
         if (reg.active && !reg.active.scriptURL.includes('/sw.js')) {
           await reg.unregister()
         }
