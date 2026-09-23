@@ -17,10 +17,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         <SidebarToggleBridge />
         <SubscriptionGuard>
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6">
             {children}
           </main>
         </SubscriptionGuard>

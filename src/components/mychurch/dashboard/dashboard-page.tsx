@@ -418,7 +418,7 @@ export function DashboardPage() {
             }}
           />
           <CardContent className="p-6 relative">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <img
                 src="/logo-mychurch.png"
                 alt="Logo"
@@ -438,7 +438,7 @@ export function DashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 shrink-0"
+                className="w-full gap-2 sm:w-auto sm:shrink-0"
                 onClick={handleRefreshDashboard}
                 disabled={refreshing || loading}
               >
